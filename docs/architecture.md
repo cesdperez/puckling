@@ -10,8 +10,8 @@
 
 ## Rules
 
-- **The daemon owns state.** The pet, agent list and everything else live on the Mac. The puck renders what it receives and reports input events. This keeps firmware small and lets most changes ship without a reflash.
-- **The pet can be rebuilt from history.** Pet state derives from the token log plus a few stored choices (name, seed). If the state file is lost, replay the transcripts.
+- **The daemon owns state.** The creature, agent list and everything else live on the Mac. The puck renders what it receives and reports input events. This keeps firmware small and lets most changes ship without a reflash.
+- **The creature can be rebuilt from history.** Its state derives from the token log plus a few stored choices (name, seed). If the state file is lost, replay the transcripts.
 - **The protocol is small JSON messages.** Daemon to puck: `state` snapshots. Puck to daemon: `input` events (`tap`, `long_press`, `turn` with degrees, `swipe`, `shake`). Version every message.
 
 ## Decisions
