@@ -43,6 +43,6 @@ test("unavailable Orca emits a disconnected snapshot instead of claiming idle is
     new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
   ]);
   expect(exit).toBe(0);
-  expect(JSON.parse(output)).toEqual({ version: 1, type: "state", state: "idle", connected: false });
+  expect(JSON.parse(output)).toMatchObject({ version: 2, type: "state", connected: false, sessions: [], age: 2147483647 });
   expect(error).toContain("Orca unavailable");
 });

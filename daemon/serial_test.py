@@ -9,8 +9,8 @@ import unittest
 
 
 DIRECTORY = Path(__file__).resolve().parent
-STATE = b'{"version":1,"type":"state","state":"needs_me","connected":true}\n'
-TAP = b'{"version":1,"type":"input","event":"tap"}\n'
+STATE = b'{"version":2,"type":"state","connected":true,"sessions":[]}\n'
+TAP = b'{"version":2,"type":"input","event":"open","id":"1111111111111111","seq":1,"request":1}\n'
 RUNNER = """
 import signal, sys
 from serial import interrupt, run

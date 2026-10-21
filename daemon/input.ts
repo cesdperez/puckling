@@ -1,37 +1,27 @@
-export class TapStream {
+export type OpenInput = { version: 2; type: "input"; event: "open"; id: string; seq: number; request: number };
+export class InputStream {
   private line = "";
   private discarded = false;
-
-  feed(bytes: Uint8Array): number {
-    let taps = 0;
+  feed(bytes: Uint8Array): OpenInput[] {
+    const events: OpenInput[] = [];
     for (const byte of bytes) {
       if (byte === 10) {
-        if (!this.discarded && this.isTap()) taps++;
-        this.line = "";
-        this.discarded = false;
-      } else if (this.line.length === 255 || byte === 0 || byte > 127) {
-        this.discarded = true;
-      } else if (!this.discarded) this.line += String.fromCharCode(byte);
+        if (!this.discarded) {
+          try {
+            const a = JSON.parse(this.line);
+            if (a?.version === 2 && a.type === "input" && a.event === "open" && /^[a-f0-9]{16}$/.test(a.id) &&
+              Number.isSafeInteger(a.seq) && a.seq > 0 && a.seq <= 2147483647 &&
+              Number.isSafeInteger(a.request) && a.request > 0 && a.request <= 2147483647 && Object.keys(a).length === 6) events.push(a);
+          } catch {}
+        }
+        this.line = ""; this.discarded = false;
+      } else if (this.line.length === 255 || byte === 0 || byte > 127) this.discarded = true;
+      else if (!this.discarded) this.line += String.fromCharCode(byte);
     }
-    return taps;
-  }
-
-  private isTap(): boolean {
-    try {
-      const input = JSON.parse(this.line);
-      return input?.version === 1 && input.type === "input" && input.event === "tap" && Object.keys(input).length === 3;
-    } catch {
-      return false;
-    }
+    return events;
   }
 }
-
-export async function readTaps(onTap: () => Promise<unknown>) {
-  const stream = new TapStream();
-  for await (const bytes of Bun.stdin.stream()) {
-    const count = stream.feed(bytes);
-    for (let i = 0; i < count; i++) {
-      void onTap().catch(error => console.error(`Unable to focus session: ${error instanceof Error ? error.message : "request failed"}`));
-    }
-  }
+export async function readInputs(onInput: (input: OpenInput) => Promise<unknown>) {
+  const stream = new InputStream();
+  for await (const bytes of Bun.stdin.stream()) for (const event of stream.feed(bytes)) void onInput(event).catch(() => console.error("Focus request failed"));
 }

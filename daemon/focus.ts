@@ -1,15 +1,5 @@
-import type { Agent, Snapshot } from "./session";
-
-export function oldestWaiting(agents: readonly Agent[]): Agent | undefined {
-  return agents.filter(agent => agent.state === "waiting" || agent.state === "blocked")
-    .sort((a, b) => (a.stateStartedAt ?? Infinity) - (b.stateStartedAt ?? Infinity) || a.id.localeCompare(b.id))[0];
-}
-
-export function sessionForTap(agents: readonly Agent[]): Agent | undefined {
-  const latest = (state: Agent["state"]) => agents.filter(agent => agent.state === state)
-    .sort((a, b) => (b.stateStartedAt ?? -Infinity) - (a.stateStartedAt ?? -Infinity) || a.id.localeCompare(b.id))[0];
-  return oldestWaiting(agents) ?? latest("working") ?? latest("done");
-}
+import { STALE_MS, SessionModel, type Agent, type Snapshot } from "./session";
+import type { OpenInput } from "./input";
 
 export function terminalForAgent(agent: Agent, terminals: readonly Record<string, unknown>[]): string {
   const matches = terminals.filter(terminal => terminal.executionHostId === agent.hostId &&
@@ -20,25 +10,41 @@ export function terminalForAgent(agent: Agent, terminals: readonly Record<string
 }
 
 export class FocusController {
-  private eligible = false;
   private busy = false;
-
-  constructor(private query: () => Promise<Agent[]>, private focus: (agent: Agent) => Promise<void>) {}
-
-  update(snapshot: Snapshot) {
-    this.eligible = snapshot.connected;
+  private lastRequest = 0;
+  private offers = new Map<number, { at: number; ids: Set<string> }>();
+  constructor(private model: SessionModel, private query: () => Promise<Agent[]>,
+    private focus: (agent: Agent) => Promise<void>, private publish: () => Promise<void>, private clock = Date.now) {}
+  offered(snapshot: Snapshot) {
+    const now = this.clock();
+    this.offers.set(snapshot.seq, { at: now, ids: new Set(snapshot.sessions.map(c => c[0])) });
+    for (const [seq, offer] of this.offers) if (now - offer.at > STALE_MS) this.offers.delete(seq);
   }
-
-  async tap(): Promise<boolean> {
-    if (!this.eligible || this.busy) return false;
+  async open(input: OpenInput): Promise<boolean> {
+    if (this.busy || input.request <= this.lastRequest) return false;
+    this.lastRequest = input.request;
+    const offer = this.offers.get(input.seq), now = this.clock();
+    const report = async (status: Parameters<SessionModel["feedback"]>[2]) => {
+      this.model.feedback(input.request, input.id, status); await this.publish();
+    };
+    if (!this.model.fresh(now) || !offer?.ids.has(input.id) || now - offer.at > STALE_MS) {
+      await report("unavailable"); return false;
+    }
     this.busy = true;
     try {
-      const target = sessionForTap(await this.query());
-      if (!target || !this.eligible) return false;
+      await report("opening");
+      const selected = this.model.find(input.id);
+      const agents = await this.query();
+      const target = agents.find(a => a.id === selected?.id);
+      if (!target || !this.model.fresh(this.clock())) { await report("unavailable"); return false; }
+      if (target.paneKey?.startsWith("structured-agent-session-") && target.hostId !== "local") {
+        await report("unsupported"); return false;
+      }
       await this.focus(target);
-      return true;
-    } finally {
-      this.busy = false;
-    }
+      this.model.acknowledge(input.id);
+      await report("opened"); return true;
+    } catch {
+      await report("retry"); return false;
+    } finally { this.busy = false; }
   }
 }
