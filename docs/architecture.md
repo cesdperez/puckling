@@ -18,10 +18,10 @@
 
 - **UI is reviewed on the Mac before it is flashed.** Three stages:
   1. Clickable HTML mockups on a 466x466 round canvas to pick a direction. Throwaway code, limited to what LVGL can draw on this chip (flat shapes, arcs, sprites, simple tweens).
-  2. The real LVGL screen code built for macOS with SDL, driven by the real daemon over a virtual serial pair (`socat` pty). Approval happens here.
+  2. The simulator in `sim/`: the firmware's drawing and world code compiled for macOS against a small Arduino and Arduino_GFX shim, shown with raylib. Mouse and keys stand in for touch and the IMU. Later the real daemon drives it over a virtual serial pair (`socat` pty). Approval happens here.
   3. Flash approved builds only. Check on the device what the simulator cannot show: AMOLED color, touch and IMU feel, frame rate.
 
-  Reason: design iteration is minutes in a browser and slow on hardware. The simulator runs the same C code as the puck, so what gets approved is what gets flashed. Full ESP32-S3 emulators (Wokwi, Espressif QEMU) were rejected because neither emulates the CO5300 display or CST9217 touch.
+  Reason: design iteration is minutes in a browser and slow on hardware. The simulator runs the same C code as the puck, so what gets approved is what gets flashed. Only hardware access (`display.cpp`, `sensors.cpp`) stays out of the simulator, so keep drawing and behaviour out of those files. Full ESP32-S3 emulators (Wokwi, Espressif QEMU) were rejected because neither emulates the CO5300 display or CST9217 touch.
 
 ## Open decisions
 

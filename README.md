@@ -8,6 +8,7 @@ The creature lives on a puck next to my keyboard. It feeds on the tokens my Clau
 
 - **Firmware** (`firmware/`): runs on the puck. Draws screens, plays sounds, reads touch and the IMU, and talks to the Mac. It holds no business logic.
 - **Daemon** (`daemon/`): runs on the Mac. Reads token usage and Orca state, owns the creature's state, and pushes frames of state to the puck.
+- **Simulator** (`sim/`): runs the firmware's pet and world code in a window on the Mac. `brew install raylib`, then `make -C sim run`. Controls are listed in the window.
 
 ## Roadmap
 
