@@ -25,7 +25,7 @@ The CLI has no push or subscribe command, so the daemon polls `worktree ps` ever
 
 ## Tap-to-focus
 
-On a `needs_me` tap the daemon refreshes `worktree ps`, then selects the oldest `waiting` or `blocked` agent by `stateStartedAt`. If no session still needs attention, it leaves focus alone.
+On any connected tap the daemon refreshes `worktree ps`, then selects the oldest `waiting` or `blocked` agent by `stateStartedAt`. If none needs attention, it opens the most recently started `working` agent, otherwise the most recently finished `done` agent. With no sessions it leaves focus alone.
 
 For a terminal agent, `paneKey` is matched exactly to `terminal list`'s `tabId:leafId`, together with the worktree and execution host. Only a unique, connected, non-orphaned terminal is used. The daemon passes its returned handle to `terminal switch` and checks the navigation receipt.
 

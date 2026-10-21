@@ -51,7 +51,7 @@ int main() {
   receive("{\"version\":1,\"type\":\"state\",\"state\":\"needs_me\",\"connected\":false}\n", 8200);
   assert(receiver.fresh(8200) && !receiver.canFocus(8200));
   receive("{\"version\":1,\"type\":\"state\",\"state\":\"working\",\"connected\":true}\n", 8300);
-  assert(!receiver.canFocus(8300));
+  assert(receiver.canFocus(8300));
   assert(receiver.snapshot().state == SessionState::Working);
   receive("{\"version\":1,\"type\":\"state\",\"state\":\"needs_me\",\"connected\":true}\n", UINT32_MAX - 100);
   assert(receiver.canFocus(100));

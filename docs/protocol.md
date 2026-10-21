@@ -38,8 +38,8 @@ On failure the daemon retains the last behaviour and sets `connected` to false. 
 {"version":1,"type":"input","event":"tap"}
 ```
 
-The simulator and physical puck send a tap when the latest snapshot is connected, no more than eight seconds old, and `needs_me`. Other touches pet the creature locally. USB writes are bounded so a disconnected Mac does not stall rendering. The daemon accepts only these three input fields, using the same 255-byte line limit. Malformed messages and unsupported versions or events are ignored.
+The simulator and physical puck send a tap when the latest snapshot is connected and no more than eight seconds old, in every expression. Without a live link, touches pet the creature locally. USB writes are bounded so a disconnected Mac does not stall rendering. The daemon accepts only these three input fields, using the same 255-byte line limit. Malformed messages and unsupported versions or events are ignored.
 
-The daemon re-queries Orca before selecting the oldest agent still in `waiting` or `blocked`. It orders agents by `stateStartedAt`, with stable identity ordering for ties. Missing timestamps sort after known timestamps. If all waiting sessions have resolved, the tap does nothing. Only one focus request can run at a time.
+The daemon re-queries Orca before selecting a session. The oldest agent still in `waiting` or `blocked` takes priority. Otherwise it selects the most recently started `working` agent, then the most recently finished `done` agent. Each group is ordered by `stateStartedAt`, with stable identity ordering for ties and missing timestamps after known ones. If no sessions remain, the tap does nothing. Only one focus request can run at a time.
 
 Terminal sessions are matched by execution host, worktree, tab, and leaf, then opened with their current runtime-issued handle. Native chats on this Mac are opened by their session identity. Focus failures are logged to stderr and can be retried with another tap. A tap only changes UI focus.

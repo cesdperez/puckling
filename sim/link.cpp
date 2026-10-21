@@ -41,7 +41,7 @@ void StateLink::poll(double now) {
 }
 
 bool StateLink::canFocus(double now) const {
-  return fd >= 0 && received && now - lastReceived <= 8 && current.connected && current.state == SessionState::NeedsMe;
+  return fd >= 0 && received && now - lastReceived <= 8 && current.connected;
 }
 
 bool StateLink::tap(double now) {

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { FocusController, oldestWaiting, terminalForAgent } from "./focus";
+import { FocusController, oldestWaiting, sessionForTap, terminalForAgent } from "./focus";
 import { TapStream } from "./input";
 import type { Agent } from "./session";
 
@@ -30,16 +30,32 @@ test("matches the exact host, worktree, tab and pane instead of another terminal
   expect(() => terminalForAgent(waiting, [terminal, { ...terminal, handle: "duplicate" }])).toThrow();
 });
 
-test("taps outside a connected needs_me state do not query or focus", async () => {
+test("live taps select waiting first, then newest working, then newest finished", () => {
+  const active = [agent("older", "working", 1), agent("newer", "working", 2), agent("done", "done", 3)];
+  expect(sessionForTap(active)?.id).toBe("newer");
+  expect(sessionForTap([...active, agent("waiting", "waiting", 0)])?.id).toBe("waiting");
+  expect(sessionForTap([agent("old", "done", 1), agent("latest", "done", 2), agent("unknown", "done")])?.id).toBe("latest");
+  expect(sessionForTap([agent("b", "working"), agent("a", "working")])?.id).toBe("a");
+  expect(sessionForTap([])).toBeUndefined();
+});
+
+test("taps before a connection or after an outage do not query or focus", async () => {
   let calls = 0;
   const focus = new FocusController(async () => { calls++; return []; }, async () => { calls++; });
-  for (const state of ["idle", "working", "just_finished"] as const) {
-    focus.update({ version: 1, type: "state", state, connected: true });
-    expect(await focus.tap()).toBe(false);
-  }
+  expect(await focus.tap()).toBe(false);
   focus.update({ version: 1, type: "state", state: "needs_me", connected: false });
   expect(await focus.tap()).toBe(false);
   expect(calls).toBe(0);
+});
+
+test("working, idle and finished expressions all allow live session navigation", async () => {
+  const focused: string[] = [];
+  const focus = new FocusController(async () => [agent("active", "working", 2)], async target => { focused.push(target.id); });
+  for (const state of ["idle", "working", "just_finished"] as const) {
+    focus.update({ version: 1, type: "state", state, connected: true });
+    expect(await focus.tap()).toBe(true);
+  }
+  expect(focused).toEqual(["active", "active", "active"]);
 });
 
 test("rechecks live agents and focuses the oldest remaining waiter", async () => {

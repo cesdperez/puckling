@@ -20,5 +20,5 @@ export async function openSession(agent: Agent, cli = callOrca, chat = revealCha
   }
   const handle = terminalForAgent(agent, result.terminals);
   const switched = await cli(["terminal", "switch", "--terminal", handle]);
-  if (switched.result?.focus?.navigated !== true) throw new Error("Orca did not focus the waiting terminal");
+  if (switched.result?.focus?.navigated !== true) throw new Error("Orca did not focus the selected terminal");
 }

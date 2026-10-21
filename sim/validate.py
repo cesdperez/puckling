@@ -21,6 +21,8 @@ focus_log = pathlib.Path(os.environ["PUCKLING_TEST_FOCUS_LOG"])
 if args == ["terminal", "list", "--limit", "10000", "--json"]:
     print(json.dumps({"ok": True, "result": {
         "truncated": False, "hostScope": {"omittedHostIds": []}, "terminals": [
+            {"handle": "term_active", "executionHostId": "local", "worktreeId": "fixture",
+             "tabId": "tab_0", "leafId": "leaf_0", "connected": True, "orphaned": False},
             {"handle": "term_waiting", "executionHostId": "local", "worktreeId": "fixture",
              "tabId": "tab_1", "leafId": "leaf_1", "connected": True, "orphaned": False},
             {"handle": "term_blocked", "executionHostId": "local", "worktreeId": "fixture",
@@ -29,8 +31,9 @@ if args == ["terminal", "list", "--limit", "10000", "--json"]:
     }}))
     sys.exit(0)
 if args[:2] == ["terminal", "switch"]:
-    assert args == ["terminal", "switch", "--terminal", "term_waiting", "--json"]
-    focus_log.write_text("term_waiting")
+    target = "term_waiting" if mode == "needs_me" else "term_active"
+    assert args == ["terminal", "switch", "--terminal", target, "--json"]
+    focus_log.write_text(target)
     print(json.dumps({"ok": True, "result": {"focus": {"navigated": True}}}))
     sys.exit(0)
 assert args == ["worktree", "ps", "--limit", "10000", "--json"]
@@ -43,7 +46,7 @@ states = {
     "idle": ["done"],
     "working": ["working"],
     "needs_me": ["working", "waiting", "blocked"],
-    "just_finished": ["working" if poll == 0 else "done", "working"],
+    "just_finished": ["working" if poll == 0 else "done"],
 }[mode]
 agents = [{"paneKey": f"tab_{i}:leaf_{i}", "state": state, "stateStartedAt": i * 100} for i, state in enumerate(states)]
 print(json.dumps({"ok": True, "result": {
@@ -78,12 +81,12 @@ print(json.dumps({"ok": True, "result": {
             assert screenshot.exists() and screenshot.stat().st_size > 1000
             if state == "just_finished":
                 assert stdout.index("session state=working") < stdout.index(expected)
-            if state == "needs_me":
+            if state != "unavailable":
                 assert "tap action=focus" in stdout
-                assert "Focused waiting session" in stderr, stderr
-                assert focus_log.read_text() == "term_waiting"
+                assert "Focused Orca session" in stderr, stderr
+                assert focus_log.read_text() == ("term_waiting" if state == "needs_me" else "term_active")
             else:
-                assert not focus_log.exists(), "A tap outside needs_me must only pet the creature"
+                assert not focus_log.exists(), "A disconnected tap must only pet the creature"
             print(f"PASS {state}: daemon -> PTY -> simulator -> {screenshot.relative_to(root)}", flush=True)
 
 

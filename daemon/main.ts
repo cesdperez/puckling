@@ -14,7 +14,8 @@ const reducer = new SessionReducer();
 const focus = new FocusController(readOrca, openSession);
 if (!args.includes("--once")) {
   void readTaps(async () => {
-    if (await focus.tap()) console.error("Focused waiting session");
+    if (await focus.tap()) console.error("Focused Orca session");
+    else console.error("Tap did not open a session: no live target, disconnected, or focus already in progress");
   }).catch(error => console.error(`Input link failed: ${error instanceof Error ? error.message : "read failed"}`));
 }
 let state: Behaviour = "idle";

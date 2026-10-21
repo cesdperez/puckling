@@ -100,7 +100,7 @@ static void drawHud(const Puck &puck, const StateLink &link) {
     DrawText(text, 20, y, 16, LIGHTGRAY);
     y += 20;
   };
-  line(link.canFocus(GetTime()) ? "click screen: open waiting session    drag bezel / arrows: turn" :
+  line(link.canFocus(GetTime()) ? "click screen: open Orca session    drag bezel / arrows: turn" :
                                 "click screen: pet    drag bezel / arrows: turn (shift: fast)");
   line("F: upright / flat on desk    V: view turns with puck / panel fixed");
   line("B: redraw bounds    S: slow motion    space: pause");

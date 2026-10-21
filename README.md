@@ -44,7 +44,7 @@ make sim-live
 
 The daemon polls Orca every two seconds and sends versioned JSON through a raw pseudo-terminal. The simulator renders `idle`, `working`, `needs_me`, and a four-second `just_finished` expression using shared firmware code. The status below the puck shows whether Orca is connected, unavailable, or the link is stale. Closing the window stops the daemon.
 
-When the pet shows `needs_me`, click anywhere on the round screen to open the oldest waiting or blocked session in Orca. The cursor and control hint change when this action is available. Other states keep the petting interaction. The daemon rechecks sessions before focusing one. Terminal sessions and native chats on this Mac are supported.
+While connected, click anywhere on the round screen to open an Orca session. The daemon rechecks sessions and chooses the oldest waiting or blocked session, otherwise the most recently started working session, otherwise the most recently finished session. The cursor and control hint show when navigation is available. Without a live link, clicks pet the creature. Terminal sessions and native chats on this Mac are supported.
 
 `ORCA_CLI_COMMAND` can select the Orca executable. Session prompts and terminal content are not sent to the simulator or stored. The protocol is in [docs/protocol.md](docs/protocol.md).
 
@@ -72,7 +72,7 @@ Plug the puck in over USB-C first. PlatformIO finds the port and downloads the E
 
 `make puck-live` finds a single `/dev/cu.usbmodem*` port and starts the Orca daemon. With multiple USB devices, select the puck with `make puck-live PORT=/dev/cu.usbmodem2101`. The same `PORT` option works for `make flash` and `make monitor`. Firmware updates use PlatformIO from your PATH or `~/.platformio/penv/bin/pio`.
 
-Leave the live command running while testing. The console prints the puck's frame rate, sensor status, session expression, and link status every two seconds. Start an Orca agent to see `working`. Leave a session waiting for input or approval to see `needs_me`, then tap the puck's screen to open the oldest waiting session. Taps in other states pet the creature. After an observed completion it celebrates for four seconds.
+Leave the live command running while testing. The console prints the puck's frame rate, sensor status, session expression, and link status every two seconds. Start an Orca agent to see `working`, then tap the screen to open it. A session waiting for input or approval produces `needs_me` and takes priority when you tap. After an observed completion it celebrates for four seconds. If all sessions are finished, a tap opens the latest finished one. Without a live link, taps pet the creature.
 
 Ctrl-C stops the daemon and closes the port. Stop it before flashing or using `make monitor`, which shows firmware diagnostics without a daemon. If you unplug the puck, reconnect it and restart `make puck-live`. The puck keeps its last expression when the link is stale, but stops sending focus taps after eight seconds without a valid snapshot.
 

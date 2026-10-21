@@ -100,7 +100,7 @@ bool SessionReceiver::feed(char byte, uint32_t now) {
 }
 
 bool SessionReceiver::canFocus(uint32_t now) const {
-  return fresh(now) && current.connected && current.state == SessionState::NeedsMe;
+  return fresh(now) && current.connected;
 }
 
 const char *sessionName(SessionState state) {

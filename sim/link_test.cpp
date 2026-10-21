@@ -33,8 +33,9 @@ int main() {
   };
   char bytes[256];
   send("working", true, 1);
-  assert(!link.tap(1));
-  assert(read(master, bytes, sizeof(bytes)) == -1 && errno == EAGAIN);
+  assert(link.tap(1));
+  ready(master);
+  assert(read(master, bytes, sizeof(bytes)) == sizeof(TAP_MESSAGE) - 1);
 
   send("needs_me", true, 2);
   assert(link.canFocus(2));
