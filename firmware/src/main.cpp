@@ -1,62 +1,40 @@
 #include <Arduino.h>
 #include "display.h"
 #include "sensors.h"
-#include "world.h"
 #include "session.h"
+#include "ui.h"
 
 static SessionReceiver session;
-
-static const char *linkStatus(uint32_t now) {
-  if (!session.hasSnapshot()) return "waiting";
-  if (!session.fresh(now)) return "stale";
-  return session.snapshot().connected ? "connected" : "unavailable";
-}
-
-void report(const Motion &m, uint32_t now) {
-  static uint32_t lastReport = 0;
-  static uint32_t frames = 0;
-  frames++;
-  if (now - lastReport < 2000) return;
-  Serial.printf("fps %lu sensors %s down=(%.2f, %.2f) spin=%.2f session=%s link=%s\n",
-                frames * 1000 / (now - lastReport), sensorStatus(), m.downX, m.downY, m.spin,
-                sessionName(session.snapshot().state), linkStatus(now));
-  frames = 0;
-  lastReport = now;
-}
-
+static CompanionUI ui;
 void setup() {
-  Serial.begin(115200);
-  Serial.setTxTimeoutMs(0);
-  if (!initDisplay()) Serial.println("display init failed");
-  if (!initSensors()) Serial.println("sensor init failed");
-  Serial.println("puckling ready protocol=1");
+  Serial.begin(115200); Serial.setTxTimeoutMs(0);
+  if(!initDisplay())Serial.println("display init failed");
+  if(!initSensors())Serial.println("sensor init failed");
+  Serial.println("Pebble ready protocol=2");
 }
-
 void loop() {
-  static uint32_t last = millis();
-  uint32_t now = millis();
-  float dt = min(0.05f, (now - last) / 1000.0f);
-  last = now;
-
-  for (int remaining = 1024; remaining > 0 && Serial.available() > 0; remaining--) {
-    session.feed(char(Serial.read()), now);
+  uint32_t now=millis();
+  for(int remaining=2048;remaining>0&&Serial.available()>0;remaining--)session.feed(char(Serial.read()),now);
+  ui.update(session.snapshot(),session.fresh(now),session.age(now),now);
+  TouchSample sample=readTouch();
+  static uint32_t lastTouch=0,lastFrame=0,lastReport=0;
+  if(sample.down)lastTouch=now;
+  static char outgoing[256];
+  static size_t sent=0, length=0;
+  char message[256];
+  if(ui.touch(sample,now,message,sizeof(message)) && length==0) {
+    strcpy(outgoing,message);length=strlen(outgoing);sent=0;
   }
-
-  Motion motion = readMotion();
-  Poke poke;
-  bool poked = readPoke(poke);
-  if (poked && session.canFocus(now) && Serial.availableForWrite() >= int(sizeof(TAP_MESSAGE) - 1)) {
-    if (Serial.write(TAP_MESSAGE) == sizeof(TAP_MESSAGE) - 1) {
-      Serial.println("tap action=focus");
-      poked = false;
-    }
+  if(length && Serial.availableForWrite()>0) {
+    size_t chunk=min(length-sent,size_t(Serial.availableForWrite()));
+    sent+=Serial.write((const uint8_t*)outgoing+sent,chunk);
+    if(sent==length)length=sent=0;
   }
-  if (poked) Serial.printf("poke %d,%d\n", poke.x, poke.y);
-
-  Pose pose = stepWorld(motion, poked ? &poke : nullptr, dt);
-  if (session.hasSnapshot()) applySession(pose, session.snapshot().state);
-
-  drawPet(beginFrame(), pose);
-  endFrame(petBounds(pose));
-  report(motion, now);
+  if(now-lastFrame>=66) {
+    displayBrightness(now-lastTouch>60000?35:160);
+    ui.draw(beginFrame(),now);endFrame({0,0,466,466});lastFrame=now;
+  }
+  if(now-lastReport>=2000) {
+    Serial.printf("Pebble page=%d sessions=%d sensors=%s link=%s\n",ui.pageIndex(),session.snapshot().count,sensorStatus(),session.canFocus(now)?"connected":"unknown");lastReport=now;
+  }
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "ui.h"
 
 // All values are in screen coordinates: x right, y down, angles clockwise.
 struct Motion {
@@ -8,12 +9,7 @@ struct Motion {
   float spin;  // rotation of the puck about the screen normal, rad/s
 };
 
-struct Poke {
-  int16_t x;
-  int16_t y;
-};
-
 bool initSensors();
 const char *sensorStatus();
 Motion readMotion();
-bool readPoke(Poke &poke);
+TouchSample readTouch();

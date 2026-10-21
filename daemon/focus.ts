@@ -1,5 +1,5 @@
-import { STALE_MS, SessionModel, type Agent, type Snapshot } from "./session";
-import type { OpenInput } from "./input";
+import { STALE_MS, SessionModel, eventKey, type Agent, type Snapshot } from "./session";
+import type { DeviceInput } from "./input";
 
 export function terminalForAgent(agent: Agent, terminals: readonly Record<string, unknown>[]): string {
   const matches = terminals.filter(terminal => terminal.executionHostId === agent.hostId &&
@@ -12,21 +12,26 @@ export function terminalForAgent(agent: Agent, terminals: readonly Record<string
 export class FocusController {
   private busy = false;
   private lastRequest = 0;
-  private offers = new Map<number, { at: number; ids: Set<string> }>();
+  private offers = new Map<number, { at: number; ids: Map<string, string | undefined> }>();
   constructor(private model: SessionModel, private query: () => Promise<Agent[]>,
     private focus: (agent: Agent) => Promise<void>, private publish: () => Promise<void>, private clock = Date.now) {}
   offered(snapshot: Snapshot) {
     const now = this.clock();
-    this.offers.set(snapshot.seq, { at: now, ids: new Set(snapshot.sessions.map(c => c[0])) });
+    this.offers.set(snapshot.seq, { at: now, ids: new Map(snapshot.sessions.map(c => [c[0], this.model.revision(c[0])])) });
     for (const [seq, offer] of this.offers) if (now - offer.at > STALE_MS) this.offers.delete(seq);
   }
-  async open(input: OpenInput): Promise<boolean> {
+  async open(input: DeviceInput): Promise<boolean> {
     if (this.busy || input.request <= this.lastRequest) return false;
     this.lastRequest = input.request;
     const offer = this.offers.get(input.seq), now = this.clock();
     const report = async (status: Parameters<SessionModel["feedback"]>[2]) => {
       this.model.feedback(input.request, input.id, status); await this.publish();
     };
+    if (input.event === "step") {
+      if (!this.model.fresh(now)) { await report("unavailable"); return false; }
+      const target = this.model.step(input.view, input.id, input.direction, now);
+      this.model.feedback(input.request, target, "selected"); await this.publish(); return true;
+    }
     if (!this.model.fresh(now) || !offer?.ids.has(input.id) || now - offer.at > STALE_MS) {
       await report("unavailable"); return false;
     }
@@ -41,7 +46,7 @@ export class FocusController {
         await report("unsupported"); return false;
       }
       await this.focus(target);
-      this.model.acknowledge(input.id);
+      if (eventKey(target) === offer.ids.get(input.id)) this.model.acknowledge(input.id, offer.ids.get(input.id));
       await report("opened"); return true;
     } catch {
       await report("retry"); return false;

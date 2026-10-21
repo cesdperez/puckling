@@ -54,3 +54,16 @@ test("input parser handles partial, malformed, oversized, extra and old version 
   for(const bad of ["garbage","x".repeat(300),line+"\0",JSON.stringify({...input,version:1}),JSON.stringify({...input,extra:1}),JSON.stringify({...input,request:-1}),JSON.stringify({...input,id:[]})])expect(stream.feed(encode(bad+"\n"))).toEqual([]);
   expect(stream.feed(encode(line+"\n"+line+"\n"))).toHaveLength(2);
 });
+
+test("browsing uses the complete daemon list and does not navigate Orca", async()=>{
+  let navigated=false;const f=fixture(async()=>[a],async()=>{navigated=true;});
+  expect(await f.controller.open({...f.input,event:"step",view:2,direction:1})).toBe(true);
+  expect(f.receipts).toEqual(["selected"]);expect(navigated).toBe(false);
+  const stream=new InputStream();expect(stream.feed(new TextEncoder().encode(JSON.stringify({...f.input,event:"step",view:2,direction:-1})+"\n"))).toHaveLength(1);
+});
+test("an older displayed event cannot acknowledge a newer question during revalidation", async()=>{
+  let f:ReturnType<typeof fixture>;
+  f=fixture(async()=>{const next={...a,stateStartedAt:2000};f.model.update([next],1000);return [next];});
+  expect(await f.controller.open(f.input)).toBe(true);
+  expect(f.model.snapshot(1000).sessions[0][6]).toBe(false);
+});

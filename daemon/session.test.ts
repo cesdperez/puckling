@@ -62,3 +62,17 @@ test("cues batch new events and acknowledgements do not repeat a cue", () => {
   m.update([agent("a","waiting"),agent("b","waiting")],2000);expect(m.snapshot(2000).cue).toBe(1);
   let s=m.snapshot(4000);expect(s.cue).toBe(2);m.acknowledge(s.sessions[0][0]);expect(m.snapshot(5000).cue).toBe(2);
 });
+
+test("all sessions remain reachable through bounded windows while page selections stay pinned", () => {
+  const m=new SessionModel(),now=1000000;
+  const rows=Array.from({length:90},(_,i)=>agent(String(i),i%2?"working":"waiting",{stateStartedAt:i,project:"Project "+i}));
+  m.update(rows,now);let s=m.snapshot(now),home=s.sessions[0][0],id=home;const reached=new Set<string>();
+  for(let i=0;i<90;i++){
+    reached.add(id);id=m.step(2,id,1,now);s=m.snapshot(now);
+    expect(s.sessions.length).toBeLessThanOrEqual(32);expect(s.sessions.some(c=>c[0]===id)).toBe(true);
+    expect(s.sessions.some(c=>c[0]===home)).toBe(true);expect(s.total).toBe(90);
+  }
+  expect(reached.size).toBe(90);
+  m.update([agent("new","waiting",{stateStartedAt:0}),...rows],now+1);
+  expect(m.snapshot(now+1).sessions.some(c=>c[0]===home)).toBe(true);
+});

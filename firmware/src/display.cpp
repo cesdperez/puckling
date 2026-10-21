@@ -46,3 +46,5 @@ void endFrame(Bounds drawn) {
   }
   panel->draw16bitRGBBitmap(dirty.x0, dirty.y0, region, w, h);
 }
+
+void displayBrightness(uint8_t level) { panel->setBrightness(level); }

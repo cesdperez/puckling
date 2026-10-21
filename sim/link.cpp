@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <string.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -26,29 +27,17 @@ void StateLink::poll(double now) {
     ssize_t count = read(fd, bytes, sizeof(bytes));
     if (count < 0 && errno == EINTR) continue;
     if (count <= 0) break;
-    for (ssize_t i = 0; i < count; i++) {
-      SessionSnapshot next;
-      if (!stream.feed(bytes[i], next)) continue;
-      if (!received || current.state != next.state || current.connected != next.connected) {
-        printf("session state=%s source=%s\n", sessionName(next.state), next.connected ? "connected" : "unavailable");
-        fflush(stdout);
-      }
-      current = next;
-      received = true;
-      lastReceived = now;
+    for (ssize_t i=0;i<count;i++) if(receiver.feed(bytes[i],uint32_t(now*1000))) {
+      const auto &s=receiver.snapshot();
+      printf("snapshot seq=%lu connected=%d count=%d attention=%d working=%d monitoring=%d feedback=%d\n",
+        (unsigned long)s.seq,s.connected,s.count,s.attention,s.working,s.monitoring,int(s.feedback));
+      fflush(stdout);
     }
   }
 }
-
-bool StateLink::canFocus(double now) const {
-  return fd >= 0 && received && now - lastReceived <= 8 && current.connected;
-}
-
-bool StateLink::tap(double now) {
-  if (!canFocus(now)) return false;
-  if (outgoing.empty()) outgoing = TAP_MESSAGE;
-  flush();
-  return fd >= 0;
+bool StateLink::send(const char *message) {
+  if(fd<0||!outgoing.empty()||strlen(message)>255)return false;
+  outgoing=message;flush();return fd>=0;
 }
 
 void StateLink::flush() {
@@ -67,9 +56,9 @@ void StateLink::flush() {
   if (sent == outgoing.size()) { outgoing.clear(); sent = 0; }
 }
 
-const char *StateLink::status(double now) const {
-  if (fd < 0) return "local preview";
-  if (!received) return "waiting for daemon";
-  if (now - lastReceived > 8) return "link stale";
-  return current.connected ? "Orca connected" : "Orca unavailable";
+const char *StateLink::status(double now)const {
+  if(fd<0)return "local preview";
+  if(!receiver.hasSnapshot())return "waiting for daemon";
+  if(!fresh(now))return "link stale";
+  return snapshot().connected?"Orca connected":"Orca unavailable";
 }

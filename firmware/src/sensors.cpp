@@ -73,18 +73,17 @@ Motion readMotion() {
   return lastMotion;
 }
 
-// The CST9217 NACKs reads unless it has just pulsed its interrupt, so read only after a pulse.
-// It pulses for every report while a finger is down; a pulse after a quiet gap starts a new poke.
-bool readPoke(Poke &poke) {
-  if (!touchReported) return false;
-  touchReported = false;
-
+// CST9217 reads are valid after an interrupt. A quiet gap synthesizes release
+// on boards whose controller does not send a final zero-point report.
+TouchSample readTouch() {
+  static TouchSample sample;
   uint32_t now = millis();
-  bool newPoke = now - lastTouchMs > 150;
-  lastTouchMs = now;
-
-  int16_t x[1], y[1];
-  if (!newPoke || touch.getPoint(x, y, 1) == 0) return false;
-  poke = {x[0], y[0]};
-  return true;
+  if (touchReported) {
+    touchReported = false;
+    int16_t x[1], y[1];
+    int count = touch.getPoint(x,y,1);
+    if (count > 0) { sample = {true,x[0],y[0]}; lastTouchMs=now; }
+    else sample.down=false;
+  } else if (sample.down && now-lastTouchMs>120) sample.down=false;
+  return sample;
 }

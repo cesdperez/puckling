@@ -1,211 +1,55 @@
-// Runs the firmware's world and pet code in a window, with the mouse and keyboard standing in for touch and the IMU.
 #include <raylib.h>
 #include <rlgl.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
-
-#include "pet.h"
-#include "sensors.h"
-#include "world.h"
+#include <vector>
+#include "ui.h"
 #include "link.h"
-
-constexpr int PANEL = 466;
-constexpr float RADIUS = PANEL / 2.0f;
-constexpr float BEZEL = 26;
-constexpr int WINDOW_W = 640;
-constexpr int WINDOW_H = 700;
-constexpr Vector2 CENTER = {WINDOW_W / 2.0f, 300};
-constexpr float SLOW_TURN = 1.5f;  // rad/s
-constexpr float FAST_TURN = 8;     // above the pet's dizzy threshold
-constexpr Color BACKGROUND = {32, 32, 36, 255};
-constexpr Color SHELL = {14, 14, 16, 255};
-constexpr uint16_t BOUNDS_565 = 0x07E0;
-
-struct Puck {
-  float angle = 0;  // clockwise on the desk, 0 with the USB port down
-  bool flat = false;
-  bool turnsOnScreen = true;
-  bool showBounds = false;
-  bool paused = false;
-  float timeScale = 1;
-  bool dragging = false;
-  float dragFrom = 0;
-};
-
-static float angleAround(Vector2 p) { return atan2f(p.y - CENTER.y, p.x - CENTER.x); }
-static float distanceFromCenter(Vector2 p) { return hypotf(p.x - CENTER.x, p.y - CENTER.y); }
-
-static float viewAngle(const Puck &puck) { return puck.turnsOnScreen ? puck.angle : 0; }
-
-static Poke toPanel(Vector2 p, const Puck &puck) {
-  float a = -viewAngle(puck);
-  float dx = p.x - CENTER.x, dy = p.y - CENTER.y;
-  return {(int16_t)lroundf(RADIUS + cosf(a) * dx - sinf(a) * dy), (int16_t)lroundf(RADIUS + sinf(a) * dx + cosf(a) * dy)};
+constexpr int PANEL=466,WINDOW_W=640,WINDOW_H=640;
+constexpr Vector2 CENTER={320,280};
+struct Action {float at;bool down;int16_t x,y;};
+static bool screenshot(const char *path){
+  Image frame={rlReadScreenPixels(GetRenderWidth(),GetRenderHeight()),GetRenderWidth(),GetRenderHeight(),1,PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+  if(!frame.data)return false;bool ok=ExportImage(frame,path);UnloadImage(frame);return ok;
 }
-
-static float turnFromKeys() {
-  float rate = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) ? FAST_TURN : SLOW_TURN;
-  return (IsKeyDown(KEY_RIGHT) - IsKeyDown(KEY_LEFT)) * rate;
-}
-
-static float turnFromDrag(Puck &puck) {
-  Vector2 mouse = GetMousePosition();
-  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && distanceFromCenter(mouse) > RADIUS) {
-    puck.dragging = true;
-    puck.dragFrom = angleAround(mouse);
+int main(int argc,char **argv){
+  const char *capture=nullptr,*path=nullptr,*script=nullptr;float after=2,tap=0;
+  for(int i=1;i<argc;i++){
+    if(!strcmp(argv[i],"--screenshot")&&i+1<argc)capture=argv[++i];
+    else if(!strcmp(argv[i],"--link")&&i+1<argc)path=argv[++i];
+    else if(!strcmp(argv[i],"--script")&&i+1<argc)script=argv[++i];
+    else if(!strcmp(argv[i],"--capture-after")&&i+1<argc)after=strtof(argv[++i],nullptr);
+    else if(!strcmp(argv[i],"--tap-after")&&i+1<argc)tap=strtof(argv[++i],nullptr);
+    else {fprintf(stderr,"Usage: %s [--link tty] [--screenshot path] [--capture-after seconds] [--script path] [--tap-after seconds]\n",argv[0]);return 1;}
   }
-  if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) puck.dragging = false;
-  if (!puck.dragging) return 0;
-  float now = angleAround(mouse);
-  float turned = atan2f(sinf(now - puck.dragFrom), cosf(now - puck.dragFrom));
-  puck.dragFrom = now;
-  return turned;
-}
-
-static void handleToggles(Puck &puck) {
-  if (IsKeyPressed(KEY_F)) puck.flat = !puck.flat;
-  if (IsKeyPressed(KEY_V)) puck.turnsOnScreen = !puck.turnsOnScreen;
-  if (IsKeyPressed(KEY_B)) puck.showBounds = !puck.showBounds;
-  if (IsKeyPressed(KEY_SPACE)) puck.paused = !puck.paused;
-  if (IsKeyPressed(KEY_S)) puck.timeScale = puck.timeScale == 1 ? 0.25f : 1;
-}
-
-// The panel sees the puck's turn mirrored: turning the puck clockwise swings world-down anticlockwise on the screen.
-static Motion senseMotion(const Puck &puck, float turnRate) {
-  float down = HALF_PI - puck.angle;
-  float g = puck.flat ? 0 : 1;
-  return {g * cosf(down), g * sinf(down), -turnRate};
-}
-
-static bool pokeFromClick(const Puck &puck, Poke &poke) {
-  Vector2 mouse = GetMousePosition();
-  if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || distanceFromCenter(mouse) > RADIUS) return false;
-  poke = toPanel(mouse, puck);
-  return true;
-}
-
-static void drawPuck(const Puck &puck, Texture2D panel) {
-  float degrees = viewAngle(puck) * RAD2DEG;
-  DrawCircleV(CENTER, RADIUS + BEZEL, SHELL);
-  DrawTexturePro(panel, {0, 0, PANEL, PANEL}, {CENTER.x, CENTER.y, PANEL, PANEL}, {RADIUS, RADIUS}, degrees, WHITE);
-  // The texture is square; this ring hides its corners so only the round panel shows.
-  DrawRing(CENTER, RADIUS, RADIUS + BEZEL, 0, 360, 128, SHELL);
-  DrawRing(CENTER, RADIUS + BEZEL, RADIUS * 2, 0, 360, 128, BACKGROUND);
-  DrawRectanglePro({CENTER.x, CENTER.y, 28, 8}, {14, -(RADIUS + BEZEL - 9)}, degrees, GRAY);
-}
-
-static void drawHud(const Puck &puck, const StateLink &link) {
-  int y = WINDOW_H - 152;
-  auto line = [&](const char *text) {
-    DrawText(text, 20, y, 16, LIGHTGRAY);
-    y += 20;
-  };
-  line(link.canFocus(GetTime()) ? "click screen: open Orca session    drag bezel / arrows: turn" :
-                                "click screen: pet    drag bezel / arrows: turn (shift: fast)");
-  line("F: upright / flat on desk    V: view turns with puck / panel fixed");
-  line("B: redraw bounds    S: slow motion    space: pause");
-  line(TextFormat("%s   %s", sessionName(link.snapshot().state), link.status(GetTime())));
-  line(TextFormat("%s   %s   %s%s", puck.flat ? "flat on desk" : "upright",
-                  puck.turnsOnScreen ? "puck view" : "panel view", puck.timeScale < 1 ? "slow  " : "",
-                  puck.paused ? "paused" : ""));
-  line(TextFormat("%d fps", GetFPS()));
-}
-
-static bool saveScreenshot(const char *path) {
-  // Read physical dimensions once: TakeScreenshot in some raylib builds doubles Retina scaling.
-  Image frame = {rlReadScreenPixels(GetRenderWidth(), GetRenderHeight()), GetRenderWidth(), GetRenderHeight(),
-                 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
-  if (!frame.data) return false;
-  bool saved = ExportImage(frame, path);
-  UnloadImage(frame);
-  return saved;
-}
-
-int main(int argc, char **argv) {
-  const char *screenshot = nullptr;
-  const char *linkPath = nullptr;
-  float captureAfter = 2;
-  float tapAfter = 0;
-  for (int i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) screenshot = argv[++i];
-    else if (strcmp(argv[i], "--link") == 0 && i + 1 < argc) linkPath = argv[++i];
-    else if ((strcmp(argv[i], "--capture-after") == 0 || strcmp(argv[i], "--tap-after") == 0) && i + 1 < argc) {
-      bool tap = strcmp(argv[i], "--tap-after") == 0;
-      char *end;
-      float seconds = strtof(argv[++i], &end);
-      if (*end || !isfinite(seconds) || seconds <= 0) return 1;
-      if (tap) tapAfter = seconds;
-      else captureAfter = seconds;
-    } else {
-      fprintf(stderr, "Usage: %s [--link tty] [--screenshot path] [--capture-after seconds] [--tap-after seconds]\n", argv[0]);
-      return 1;
-    }
+  std::vector<Action> actions;
+  if(script){FILE *f=fopen(script,"r");if(!f)return 1;float at;int down,x,y;while(fscanf(f,"%f %d %d %d",&at,&down,&x,&y)==4)actions.push_back({at,down!=0,int16_t(x),int16_t(y)});fclose(f);}
+  if(tap>0){actions.push_back({tap,true,233,390});actions.push_back({tap+0.1f,false,233,390});}
+  StateLink link(path);if(path&&!link.opened())return 1;
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI|FLAG_VSYNC_HINT);
+  InitWindow(WINDOW_W,WINDOW_H,"Pebble / Orca session companion");if(!IsWindowReady())return 1;SetTargetFPS(60);
+  Arduino_GFX gfx(PANEL,PANEL);Image blank=GenImageColor(PANEL,PANEL,BLACK);ImageFormat(&blank,PIXELFORMAT_UNCOMPRESSED_R5G6B5);
+  Texture2D panel=LoadTextureFromImage(blank);SetTextureFilter(panel,TEXTURE_FILTER_POINT);UnloadImage(blank);
+  CompanionUI ui;TouchSample sample;size_t action=0;bool saved=true;int lastPage=-1;float elapsed=0;
+  while(!WindowShouldClose()){
+    double now=GetTime();uint32_t ms=uint32_t(now*1000);link.poll(now);ui.update(link.snapshot(),link.fresh(now),link.age(now),ms);
+    Vector2 mouse=GetMousePosition();
+    if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT))sample={true,int16_t(mouse.x-87),int16_t(mouse.y-47)};
+    if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)&&sample.down){sample.x=mouse.x-87;sample.y=mouse.y-47;}
+    if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT))sample.down=false;
+    while(action<actions.size()&&elapsed>=actions[action].at){const auto &a=actions[action++];sample={a.down,a.x,a.y};
+      char message[256];if(ui.touch(sample,ms,message,sizeof(message))&&link.send(message)){printf("input action=open\n");fflush(stdout);}}
+    char message[256];if(ui.touch(sample,ms,message,sizeof(message))&&link.send(message)){printf("input action=open\n");fflush(stdout);}
+    if(lastPage!=ui.pageIndex()){printf("page=%d\n",ui.pageIndex());fflush(stdout);lastPage=ui.pageIndex();}
+    ui.draw(&gfx,ms);UpdateTexture(panel,gfx.framebuffer());
+    BeginDrawing();ClearBackground({28,29,34,255});
+    DrawCircleV(CENTER,248,{12,13,17,255});DrawTexture(panel,87,47,WHITE);
+    DrawRing(CENTER,233,500,0,360,180,{28,29,34,255});DrawRing(CENTER,233,248,0,360,180,{12,13,17,255});
+    DrawText("Swipe horizontally: screens",30,551,19,LIGHTGRAY);
+    DrawText("Swipe vertically / arrows: cards. Tap pill: open.",30,579,18,LIGHTGRAY);
+    DrawText(link.status(now),30,608,16,GRAY);EndDrawing();
+    elapsed+=GetFrameTime();if(capture&&elapsed>after){saved=screenshot(capture);break;}
   }
-  StateLink link(linkPath);
-  if (linkPath && !link.opened()) return 1;
-  float elapsed = 0;
-
-  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
-  InitWindow(WINDOW_W, WINDOW_H, "puckling sim");
-  if (!IsWindowReady()) return 1;
-  SetTargetFPS(60);
-
-  Arduino_GFX gfx(PANEL, PANEL);
-  Image blank = GenImageColor(PANEL, PANEL, BLACK);
-  ImageFormat(&blank, PIXELFORMAT_UNCOMPRESSED_R5G6B5);
-  Texture2D panel = LoadTextureFromImage(blank);
-  UnloadImage(blank);
-
-  Puck puck;
-  bool saved = true;
-  while (!WindowShouldClose()) {
-    link.poll(GetTime());
-    SetMouseCursor(link.canFocus(GetTime()) && distanceFromCenter(GetMousePosition()) <= RADIUS ?
-                   MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
-    handleToggles(puck);
-    float dt = puck.paused ? 0 : min(0.05f, GetFrameTime()) * puck.timeScale;
-
-    float turned = turnFromDrag(puck) + turnFromKeys() * dt;
-    if (dt <= 0) turned = 0;
-    puck.angle += turned;
-
-    Poke poke;
-    bool poked = pokeFromClick(puck, poke);
-    if (tapAfter > 0 && elapsed >= tapAfter) {
-      poke = {233, 360};
-      poked = true;
-      tapAfter = 0;
-    }
-    if (poked && link.tap(GetTime())) {
-      printf("tap action=focus\n");
-      fflush(stdout);
-      poked = false;
-    }
-    Pose pose = stepWorld(senseMotion(puck, dt > 0 ? turned / dt : 0), poked ? &poke : nullptr, dt);
-    applySession(pose, link.snapshot().state);
-
-    gfx.fillScreen(RGB565_BLACK);
-    drawPet(&gfx, pose);
-    if (puck.showBounds) {
-      Bounds b = petBounds(pose);
-      gfx.drawRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, BOUNDS_565);
-    }
-    UpdateTexture(panel, gfx.framebuffer());
-
-    BeginDrawing();
-    ClearBackground(BACKGROUND);
-    drawPuck(puck, panel);
-    drawHud(puck, link);
-    EndDrawing();
-
-    elapsed += GetFrameTime();
-    if (screenshot && elapsed > captureAfter) {
-      saved = saveScreenshot(screenshot);
-      break;
-    }
-  }
-
-  UnloadTexture(panel);
-  CloseWindow();
-  return saved ? 0 : 1;
+  UnloadTexture(panel);CloseWindow();return saved?0:1;
 }

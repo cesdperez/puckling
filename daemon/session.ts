@@ -10,8 +10,8 @@ export const MAX_SESSIONS = 32;
 export const MAX_LINE = 12288;
 export const STALE_MS = 8000;
 export type Card = [id: string, project: string, label: string, agent: string,
-  state: number, attention: boolean, seen: boolean, supported: boolean, reason: string];
-export type Feedback = "none" | "opening" | "opened" | "retry" | "unavailable" | "unsupported";
+  state: number, attention: boolean, seen: boolean, supported: boolean, reason: string, position: number];
+export type Feedback = "none" | "opening" | "opened" | "retry" | "unavailable" | "unsupported" | "selected";
 export type Snapshot = {
   version: 2; type: "state"; seq: number; connected: boolean; age: number;
   total: number; attention: number; working: number; monitoring: number; cue: number;
@@ -70,7 +70,7 @@ export function cardState(a: Agent): number {
   return 7;
 }
 const actionable = (a: Agent) => [0, 1, 2].includes(cardState(a));
-const eventKey = (a: Agent) => `${a.state}/${a.stateStartedAt ?? ""}/${a.outcome ?? ""}`;
+export const eventKey = (a: Agent) => `${a.state}/${a.stateStartedAt ?? ""}/${a.outcome ?? ""}`;
 export class SessionModel {
   private salt = randomBytes(16).toString("hex");
   private previous = new Map<string, string>();
@@ -80,6 +80,8 @@ export class SessionModel {
   private connected = false;
   private baseline = true;
   private seq = 0;
+  private pins = ["", "", ""];
+  private window = 0;
   private cue = 0;
   private lastCue = -Infinity;
   private pendingCue = false;
@@ -90,7 +92,7 @@ export class SessionModel {
     for (const id of this.alerts.keys()) if (!live.has(id)) this.alerts.delete(id);
     for (const a of agents) {
       const event = eventKey(a), old = this.previous.get(a.id), alert = this.alerts.get(a.id);
-      const completed = !this.baseline && old !== undefined && old !== event && cardState(a) === 3;
+      const completed = !this.baseline && old !== undefined && old !== event && [3, 7].includes(cardState(a));
       if ((actionable(a) || completed) && alert?.event !== event) {
         this.alerts.set(a.id, { event, seen: false });
         this.pendingCue = true;
@@ -103,28 +105,52 @@ export class SessionModel {
   disconnect() { this.connected = false; this.baseline = true; this.previous.clear(); }
   fresh(now: number) { return this.connected && now - this.queriedAt <= STALE_MS; }
   find(token: string) { return this.agents.get(token); }
-  acknowledge(token: string) {
+  revision(token: string) { const a = this.find(token); return a ? eventKey(a) : undefined; }
+  acknowledge(token: string, revision = this.revision(token)) {
+    if (this.revision(token) !== revision) return;
     const a = this.find(token), alert = a && this.alerts.get(a.id);
     if (!alert) return;
-    if (cardState(a!) === 3) this.alerts.delete(a!.id);
+    if (a!.state === "done" && !actionable(a!)) this.alerts.delete(a!.id);
     else alert.seen = true;
   }
   feedback(request: number, target: string, feedback: Feedback) { this.receipt = { request, target, feedback }; }
-  snapshot(now: number): Snapshot {
-    if (this.pendingCue && now - this.lastCue >= 3000) { this.cue++; this.lastCue = now; this.pendingCue = false; }
+  private ordered(now: number) {
     const all = [...this.agents.values()];
     const alert = (a: Agent) => this.alerts.get(a.id);
-    const rank = (a: Agent) => alert(a) ? (cardState(a) === 3 ? 2 : alert(a)!.seen ? 1 : 0) : a.state === "working" ? 3 : 4;
+    const rank = (a: Agent) => alert(a) ? (!actionable(a) ? 2 : alert(a)!.seen ? 1 : 0) : a.state === "working" ? 3 : 4;
     const recent = all.filter(a => alert(a) || a.state !== "done" || now - (a.stateStartedAt ?? -Infinity) <= 86400000);
     recent.sort((a, b) => rank(a) - rank(b) || (rank(a) < 3 ?
       (a.stateStartedAt ?? Infinity) - (b.stateStartedAt ?? Infinity) :
       (b.stateStartedAt ?? -Infinity) - (a.stateStartedAt ?? -Infinity)) || a.id.localeCompare(b.id));
-    const sessions: Card[] = recent.slice(0, MAX_SESSIONS).map(a => [this.token(a), a.project ?? "Project",
+    return recent;
+  }
+  step(view: number, id: string, direction: number, now: number): string {
+    const rows = this.ordered(now).filter(a => view === 2 || this.alerts.has(a.id));
+    if (!rows.length) { this.pins[view] = ""; return ""; }
+    const at = rows.findIndex(a => this.token(a) === id);
+    const unseen = view === 0 && at >= 0 && this.alerts.get(rows[at].id)?.seen ? rows.find(a => !this.alerts.get(a.id)?.seen && actionable(a)) : undefined;
+    const target = unseen ?? rows[at < 0 ? (direction > 0 ? 0 : rows.length - 1) : (at + direction + rows.length) % rows.length];
+    const token = this.token(target); this.pins[view] = token;
+    this.window = Math.max(0, this.ordered(now).findIndex(a => this.token(a) === token) - 14);
+    return token;
+  }
+  snapshot(now: number): Snapshot {
+    if (this.pendingCue && now - this.lastCue >= 3000) { this.cue++; this.lastCue = now; this.pendingCue = false; }
+    const all = [...this.agents.values()], recent = this.ordered(now);
+    const alert = (a: Agent) => this.alerts.get(a.id);
+    for (let view = 0; view < 3; view++) if (!this.pins[view]) {
+      const first = recent.find(a => view === 2 || alert(a));
+      if (first) this.pins[view] = this.token(first);
+    }
+    const chosen = new Set(recent.filter(a => this.pins.includes(this.token(a))));
+    for (const a of recent.slice(this.window)) { if (chosen.size === MAX_SESSIONS) break; chosen.add(a); }
+    for (const a of recent) { if (chosen.size === MAX_SESSIONS) break; chosen.add(a); }
+    const sessions: Card[] = recent.filter(a => chosen.has(a)).map(a => [this.token(a), a.project ?? "Project",
       // The suffix disambiguates identical or missing titles without exposing paths.
-      textLabel(a.title, 16, "Session") + " " + this.token(a).slice(0, 4), a.agentType ?? "Agent", cardState(a),
+      textLabel(a.title, 12, "Session") + " " + this.token(a).slice(0, 8), a.agentType ?? "Agent", cardState(a),
       !!alert(a), alert(a)?.seen ?? false, !(a.paneKey?.startsWith("structured-agent-session-") && a.hostId !== "local"),
       cardState(a) === 0 ? "Waiting for your input" : cardState(a) === 1 ? "Needs your attention" :
-      cardState(a) === 2 ? "Run reported failure" : cardState(a) === 7 ? "Outcome not reported" : ""]);
+      cardState(a) === 2 ? "Run reported failure" : cardState(a) === 7 ? "Outcome not reported" : "", recent.indexOf(a) + 1]);
     return { version: 2, type: "state", seq: ++this.seq, connected: this.connected,
       age: Number.isFinite(this.queriedAt) ? Math.min(2147483647, Math.max(0, now - this.queriedAt)) : 2147483647,
       total: recent.length, attention: recent.filter(a => alert(a)).length,

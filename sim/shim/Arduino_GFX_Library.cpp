@@ -50,3 +50,19 @@ void Arduino_GFX::drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t 
     pixel(x + w - 1, y + i, color);
   }
 }
+
+void Arduino_GFX::fillRect(int16_t x,int16_t y,int16_t w,int16_t h,uint16_t c){for(int yy=y;yy<y+h;yy++)hline(x,x+w-1,yy,c);}
+void Arduino_GFX::drawLine(int16_t x,int16_t y,int16_t xx,int16_t yy,uint16_t c){
+  int dx=abs(xx-x),sx=x<xx?1:-1,dy=-abs(yy-y),sy=y<yy?1:-1,err=dx+dy;
+  for(;;){pixel(x,y,c);if(x==xx&&y==yy)break;int e=2*err;if(e>=dy){err+=dy;x+=sx;}if(e<=dx){err+=dx;y+=sy;}}
+}
+void Arduino_GFX::fillCircle(int16_t x,int16_t y,int16_t r,uint16_t c){for(int yy=-r;yy<=r;yy++)for(int xx=-r;xx<=r;xx++)if(xx*xx+yy*yy<=r*r)pixel(x+xx,y+yy,c);}
+void Arduino_GFX::drawCircle(int16_t x,int16_t y,int16_t r,uint16_t c){for(int yy=-r;yy<=r;yy++)for(int xx=-r;xx<=r;xx++)if(xx*xx+yy*yy<=r*r&&xx*xx+yy*yy>=(r-1)*(r-1))pixel(x+xx,y+yy,c);}
+void Arduino_GFX::fillRoundRect(int16_t x,int16_t y,int16_t w,int16_t h,int16_t r,uint16_t c){
+  fillRect(x+r,y,w-2*r,h,c);fillRect(x,y+r,w,h-2*r,c);
+  fillCircle(x+r,y+r,r,c);fillCircle(x+w-r-1,y+r,r,c);fillCircle(x+r,y+h-r-1,r,c);fillCircle(x+w-r-1,y+h-r-1,r,c);
+}
+void Arduino_GFX::drawRoundRect(int16_t x,int16_t y,int16_t w,int16_t h,int16_t r,uint16_t c){
+  drawLine(x+r,y,x+w-r,y,c);drawLine(x+r,y+h-1,x+w-r,y+h-1,c);drawLine(x,y+r,x,y+h-r,c);drawLine(x+w-1,y+r,x+w-1,y+h-r,c);
+  for(int yy=0;yy<r;yy++)for(int xx=0;xx<r;xx++){int d=(xx-r)*(xx-r)+(yy-r)*(yy-r);if(d<=r*r&&d>=(r-1)*(r-1)){pixel(x+xx,y+yy,c);pixel(x+w-1-xx,y+yy,c);pixel(x+xx,y+h-1-yy,c);pixel(x+w-1-xx,y+h-1-yy,c);}}
+}
