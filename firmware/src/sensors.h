@@ -14,5 +14,6 @@ struct Poke {
 };
 
 bool initSensors();
+const char *sensorStatus();
 Motion readMotion();
 bool readPoke(Poke &poke);

@@ -8,7 +8,8 @@ void report(const Motion &m, uint32_t now) {
   static uint32_t frames = 0;
   frames++;
   if (now - lastReport < 2000) return;
-  Serial.printf("fps %lu down=(%.2f, %.2f) spin=%.2f\n", frames * 1000 / (now - lastReport), m.downX, m.downY, m.spin);
+  Serial.printf("fps %lu sensors %s down=(%.2f, %.2f) spin=%.2f\n", frames * 1000 / (now - lastReport), sensorStatus(),
+                m.downX, m.downY, m.spin);
   frames = 0;
   lastReport = now;
 }

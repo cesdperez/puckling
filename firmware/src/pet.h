@@ -4,7 +4,7 @@
 enum class Eyes { Open, Blink, Squeeze, Dizzy };
 
 // The pet's local frame has its origin between the feet, x to its right, y toward its feet.
-constexpr float PET_CELL = 10;
+constexpr float PET_CELL = 16;
 constexpr float PET_HALF_WIDTH = 8 * PET_CELL;
 constexpr float PET_HEIGHT = 5 * 2 * PET_CELL;
 
