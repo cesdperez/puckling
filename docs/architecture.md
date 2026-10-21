@@ -23,7 +23,7 @@
 
   Reason: design iteration is minutes in a browser and slow on hardware. The simulator runs the same C code as the puck, so what gets approved is what gets flashed. Only hardware access (`display.cpp`, `sensors.cpp`) stays out of the simulator, so keep drawing and behaviour out of those files. Full ESP32-S3 emulators (Wokwi, Espressif QEMU) were rejected because neither emulates the CO5300 display or CST9217 touch.
 
-- **The first link is USB serial.** The puck sits on the desk plugged in, so no pairing or credentials are needed. The simulator validates the state protocol over a pseudo-terminal before the physical serial integration. Wi-Fi remains a later option for battery use.
+- **The first link is USB serial.** The puck sits on the desk plugged in, so no pairing or credentials are needed. The simulator validates the state protocol over a pseudo-terminal. The physical puck uses the same protocol over USB Serial/JTAG, with a Python standard-library bridge to the daemon. Firmware reads snapshots, applies the shared expressions, and reports touch events. Wi-Fi remains a later option for battery use.
 
 - **Firmware uses PlatformIO with Arduino-ESP32.** It matches the board examples and the working firmware. ESP-IDF is an option if the Arduino framework reaches a limit.
 

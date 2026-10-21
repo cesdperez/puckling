@@ -59,16 +59,22 @@ Validation screenshots and logs are saved under `sim/build/validation/`. To capt
 python3 sim/live.py --screenshot /tmp/puckling.png
 ```
 
-This implements session state and tap-to-focus in the simulator. Token feeding, hunger, sounds, persistence, and physical USB serial integration are still pending.
+Session state and tap-to-focus work in the simulator and on the USB puck. Token feeding, hunger, sounds, and persistence are still pending.
 
 ### Flash the puck
 
 ```sh
 make flash
-make monitor
+make puck-live
 ```
 
-Plug the puck in over USB-C first. PlatformIO finds the port and downloads the ESP32 toolchain and libraries on the first build. The monitor prints frame rate, sensor status and pokes every 2 seconds. If the upload cannot connect, hold BOOT while you plug the puck in, then upload again.
+Plug the puck in over USB-C first. PlatformIO finds the port and downloads the ESP32 toolchain and libraries on the first build. If the upload cannot connect, hold BOOT while you plug the puck in, then upload again.
+
+`make puck-live` finds a single `/dev/cu.usbmodem*` port and starts the Orca daemon. With multiple USB devices, select the puck with `make puck-live PORT=/dev/cu.usbmodem2101`. The same `PORT` option works for `make flash` and `make monitor`. Firmware updates use PlatformIO from your PATH or `~/.platformio/penv/bin/pio`.
+
+Leave the live command running while testing. The console prints the puck's frame rate, sensor status, session expression, and link status every two seconds. Start an Orca agent to see `working`. Leave a session waiting for input or approval to see `needs_me`, then tap the puck's screen to open the oldest waiting session. Taps in other states pet the creature. After an observed completion it celebrates for four seconds.
+
+Ctrl-C stops the daemon and closes the port. Stop it before flashing or using `make monitor`, which shows firmware diagnostics without a daemon. If you unplug the puck, reconnect it and restart `make puck-live`. The puck keeps its last expression when the link is stale, but stops sending focus taps after eight seconds without a valid snapshot.
 
 ## Roadmap
 

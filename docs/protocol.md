@@ -1,6 +1,8 @@
 # Puck protocol
 
-The daemon writes one JSON object per line to stdout and reads input events from stdin. `sim/live.py` connects both streams to a raw pseudo-terminal; the simulator opens its slave at 115200 baud for reading and writing. The framing is intended for physical USB serial too. Every poll sends a complete snapshot, so a receiver can join at any time.
+The daemon writes one JSON object per line to stdout and reads input events from stdin. `sim/live.py` connects both streams to a raw pseudo-terminal; the simulator opens its slave at 115200 baud for reading and writing. `daemon/serial.py` connects the same streams to the puck's USB serial port at 115200 baud in raw mode. Every poll sends a complete snapshot, so a receiver can join at any time.
+
+The puck reports plain-text diagnostic lines on the same port. The serial bridge prints these to stderr, and the daemon's input parser ignores them. The bridge handles partial writes in both directions, limits pending data to 64 KiB per direction, and stops its daemon when the live command exits or the USB connection fails.
 
 ```json
 {"version":1,"type":"state","state":"working","connected":true}
@@ -28,7 +30,7 @@ Priority is `needs_me`, then `just_finished`, then `working`, then `idle`:
 
 The first query establishes a baseline. Existing finished agents do not trigger a celebration. Disappearing agents do not count as completions. After an outage, the next successful query establishes a fresh baseline.
 
-On failure the daemon retains the last behaviour and sets `connected` to false. The simulator marks the source as unavailable. If no valid snapshot arrives for eight seconds, it marks the link as stale. Neither case is presented as a confirmed idle session list.
+On failure the daemon retains the last behaviour and sets `connected` to false. The simulator marks the source as unavailable. If no valid snapshot arrives for eight seconds, it marks the link as stale. The physical puck reports the same conditions in its serial diagnostics and retains its last expression. Neither case is presented as a confirmed idle session list.
 
 ## Tap input
 
@@ -36,7 +38,7 @@ On failure the daemon retains the last behaviour and sets `connected` to false. 
 {"version":1,"type":"input","event":"tap"}
 ```
 
-The simulator sends a tap when its latest snapshot is connected, fresh, and `needs_me`. Other clicks pet the creature locally. The daemon accepts only these three input fields, using the same 255-byte line limit. Malformed messages and unsupported versions or events are ignored.
+The simulator and physical puck send a tap when the latest snapshot is connected, no more than eight seconds old, and `needs_me`. Other touches pet the creature locally. USB writes are bounded so a disconnected Mac does not stall rendering. The daemon accepts only these three input fields, using the same 255-byte line limit. Malformed messages and unsupported versions or events are ignored.
 
 The daemon re-queries Orca before selecting the oldest agent still in `waiting` or `blocked`. It orders agents by `stateStartedAt`, with stable identity ordering for ties. Missing timestamps sort after known timestamps. If all waiting sessions have resolved, the tap does nothing. Only one focus request can run at a time.
 
