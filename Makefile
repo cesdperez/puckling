@@ -1,4 +1,4 @@
-.PHONY: setup sim flash monitor
+.PHONY: setup sim sim-live test validate-sim flash monitor
 
 setup:
 	@command -v brew >/dev/null || { echo "Install Homebrew first: https://brew.sh"; exit 1; }
@@ -8,6 +8,19 @@ setup:
 
 sim:
 	$(MAKE) -C sim run
+
+sim-live:
+	@command -v bun >/dev/null || { echo "Install Bun first: https://bun.sh"; exit 1; }
+	$(MAKE) -C sim build/puckling-sim
+	python3 sim/live.py
+
+test:
+	bun test daemon
+	$(MAKE) -C sim test
+
+validate-sim:
+	$(MAKE) -C sim build/puckling-sim
+	python3 sim/validate.py
 
 flash:
 	pio run -d firmware -t upload

@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino_GFX_Library.h>
 
-enum class Eyes { Open, Blink, Squeeze, Dizzy };
+enum class Eyes { Open, Blink, Squeeze, Dizzy, Focused, Alert, Happy };
 
 // The pet's local frame has its origin between the feet, x to its right, y toward its feet.
 constexpr float PET_CELL = 16;

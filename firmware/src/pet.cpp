@@ -55,6 +55,20 @@ static void drawEye(const Frame &f, float col, bool leftEye, const Pose &p) {
     case Eyes::Blink:
       f.rect(x - 1, cy - 2, CELL + 2, 4, EYE);
       break;
+    case Eyes::Focused:
+      f.rect(x - 2, cy, CELL + 4, ROW / 2, EYE);
+      break;
+    case Eyes::Alert:
+      f.rect(x - 3, y - 2, CELL + 6, ROW + 4, EYE);
+      f.rect(x, y + 2, 4, 6, BODY);
+      break;
+    case Eyes::Happy: {
+      const float left[4][2] = {{x - 3, cy + 4}, {cx, cy - 7}, {cx, cy - 1}, {x - 3, cy + 10}};
+      const float right[4][2] = {{cx, cy - 7}, {x + CELL + 3, cy + 4}, {x + CELL + 3, cy + 10}, {cx, cy - 1}};
+      f.quad(left, EYE);
+      f.quad(right, EYE);
+      break;
+    }
     case Eyes::Squeeze:
       if (leftEye) {
         f.triangle(x - 2, y + 2, x + CELL + 2, cy, x - 2, y + ROW - 2, EYE);

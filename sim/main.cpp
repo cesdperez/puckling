@@ -1,10 +1,13 @@
 // Runs the firmware's world and pet code in a window, with the mouse and keyboard standing in for touch and the IMU.
 #include <raylib.h>
+#include <rlgl.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "pet.h"
 #include "sensors.h"
 #include "world.h"
+#include "link.h"
 
 constexpr int PANEL = 466;
 constexpr float RADIUS = PANEL / 2.0f;
@@ -91,8 +94,8 @@ static void drawPuck(const Puck &puck, Texture2D panel) {
   DrawRectanglePro({CENTER.x, CENTER.y, 28, 8}, {14, -(RADIUS + BEZEL - 9)}, degrees, GRAY);
 }
 
-static void drawHud(const Puck &puck) {
-  int y = WINDOW_H - 132;
+static void drawHud(const Puck &puck, const StateLink &link) {
+  int y = WINDOW_H - 152;
   auto line = [&](const char *text) {
     DrawText(text, 20, y, 16, LIGHTGRAY);
     y += 20;
@@ -100,14 +103,41 @@ static void drawHud(const Puck &puck) {
   line("click screen: poke    drag bezel / arrows: turn puck (shift: fast)");
   line("F: upright / flat on desk    V: view turns with puck / panel fixed");
   line("B: redraw bounds    S: slow motion    space: pause");
+  line(TextFormat("%s   %s", sessionName(link.snapshot().state), link.status(GetTime())));
   line(TextFormat("%s   %s   %s%s", puck.flat ? "flat on desk" : "upright",
                   puck.turnsOnScreen ? "puck view" : "panel view", puck.timeScale < 1 ? "slow  " : "",
                   puck.paused ? "paused" : ""));
   line(TextFormat("%d fps", GetFPS()));
 }
 
+static bool saveScreenshot(const char *path) {
+  // Read physical dimensions once: TakeScreenshot in some raylib builds doubles Retina scaling.
+  Image frame = {rlReadScreenPixels(GetRenderWidth(), GetRenderHeight()), GetRenderWidth(), GetRenderHeight(),
+                 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+  if (!frame.data) return false;
+  bool saved = ExportImage(frame, path);
+  UnloadImage(frame);
+  return saved;
+}
+
 int main(int argc, char **argv) {
-  const char *screenshot = argc == 3 && strcmp(argv[1], "--screenshot") == 0 ? argv[2] : nullptr;
+  const char *screenshot = nullptr;
+  const char *linkPath = nullptr;
+  float captureAfter = 2;
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) screenshot = argv[++i];
+    else if (strcmp(argv[i], "--link") == 0 && i + 1 < argc) linkPath = argv[++i];
+    else if (strcmp(argv[i], "--capture-after") == 0 && i + 1 < argc) {
+      char *end;
+      captureAfter = strtof(argv[++i], &end);
+      if (*end || !isfinite(captureAfter) || captureAfter <= 0) return 1;
+    } else {
+      fprintf(stderr, "Usage: %s [--link tty] [--screenshot path] [--capture-after seconds]\n", argv[0]);
+      return 1;
+    }
+  }
+  StateLink link(linkPath);
+  if (linkPath && !link.opened()) return 1;
   float elapsed = 0;
 
   SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
@@ -122,7 +152,9 @@ int main(int argc, char **argv) {
   UnloadImage(blank);
 
   Puck puck;
+  bool saved = true;
   while (!WindowShouldClose()) {
+    link.poll(GetTime());
     handleToggles(puck);
     float dt = puck.paused ? 0 : min(0.05f, GetFrameTime()) * puck.timeScale;
 
@@ -133,6 +165,7 @@ int main(int argc, char **argv) {
     Poke poke;
     bool poked = pokeFromClick(puck, poke);
     Pose pose = stepWorld(senseMotion(puck, dt > 0 ? turned / dt : 0), poked ? &poke : nullptr, dt);
+    applySession(pose, link.snapshot().state);
 
     gfx.fillScreen(RGB565_BLACK);
     drawPet(&gfx, pose);
@@ -145,16 +178,17 @@ int main(int argc, char **argv) {
     BeginDrawing();
     ClearBackground(BACKGROUND);
     drawPuck(puck, panel);
-    drawHud(puck);
+    drawHud(puck, link);
     EndDrawing();
 
     elapsed += GetFrameTime();
-    if (screenshot && elapsed > 2) {
-      TakeScreenshot(screenshot);
+    if (screenshot && elapsed > captureAfter) {
+      saved = saveScreenshot(screenshot);
       break;
     }
   }
 
   UnloadTexture(panel);
   CloseWindow();
+  return saved ? 0 : 1;
 }
