@@ -1,6 +1,13 @@
 export type Behaviour = "idle" | "working" | "needs_me" | "just_finished";
 export type AgentState = "working" | "waiting" | "blocked" | "done";
-export type Agent = { id: string; state: AgentState };
+export type Agent = {
+  id: string;
+  state: AgentState;
+  hostId?: string;
+  worktreeId?: string;
+  paneKey?: string;
+  stateStartedAt?: number;
+};
 export type Snapshot = { version: 1; type: "state"; state: Behaviour; connected: boolean };
 
 function record(value: unknown): Record<string, unknown> {
@@ -30,7 +37,12 @@ export function parseOrca(value: unknown): Agent[] {
       if (typeof agent.paneKey !== "string" || !["working", "waiting", "blocked", "done"].includes(String(agent.state))) {
         throw new Error("Invalid Orca agent");
       }
-      agents.push({ id: `${tree.hostId}/${tree.worktreeId}/${agent.paneKey}`, state: agent.state as AgentState });
+      agents.push({
+        id: `${tree.hostId}/${tree.worktreeId}/${agent.paneKey}`, state: agent.state as AgentState,
+        hostId: tree.hostId, worktreeId: tree.worktreeId, paneKey: agent.paneKey,
+        ...(typeof agent.stateStartedAt === "number" && Number.isFinite(agent.stateStartedAt) && agent.stateStartedAt >= 0
+          ? { stateStartedAt: agent.stateStartedAt } : {}),
+      });
     }
   }
   return agents;

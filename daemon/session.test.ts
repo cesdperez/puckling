@@ -14,7 +14,7 @@ const response = (agents: unknown[] = []) => ({
 describe("Orca snapshots", () => {
   test("extracts stable identities without retaining session content", () => {
     expect(parseOrca(response([{ paneKey: "pane", state: "working", prompt: "private" }]))).toEqual([
-      agent("local/tree/pane", "working"),
+      { ...agent("local/tree/pane", "working"), hostId: "local", worktreeId: "tree", paneKey: "pane" },
     ]);
   });
 
