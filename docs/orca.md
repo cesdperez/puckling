@@ -15,12 +15,21 @@ Checked against Orca 1.4.232.
 | Read a terminal | `orca terminal read` | bounded output |
 | Answer an agent | `orca terminal send` | input to a live terminal, e.g. approve a prompt |
 | Bring it to the front | `orca terminal switch` | focus a terminal tab on the Mac |
+| Bring a native chat to the front | Runtime API `agentSession.reveal` | No matching CLI command; uses the installed app's bundled runtime client. Local Mac chats only. |
 | Automation runs | `orca automations runs` | history of scheduled runs |
 | Decision gates | `orca orchestration gate-list` | pending decisions that block a task |
 
 Agent states are `working`, `blocked`, `waiting`, `done` (see `src/shared/workspace-session-sleeping-agents.ts` in the Orca repo). `orca agent-context` prints the full machine-readable command schema.
 
 The CLI has no push or subscribe command, so the daemon polls `worktree ps` every 2 seconds and diffs. Orca also has hooks and a mobile relay (`cloud/` in its repo), which might allow push later.
+
+## Tap-to-focus
+
+On a `needs_me` tap the daemon refreshes `worktree ps`, then selects the oldest `waiting` or `blocked` agent by `stateStartedAt`. If no session still needs attention, it leaves focus alone.
+
+For a terminal agent, `paneKey` is matched exactly to `terminal list`'s `tabId:leafId`, together with the worktree and execution host. Only a unique, connected, non-orphaned terminal is used. The daemon passes its returned handle to `terminal switch` and checks the navigation receipt.
+
+For a native chat, `paneKey` is `structured-agent-session-<sessionId>:<leafId>`. The chat identity is in the tab portion, not the leaf. The daemon uses the installed macOS app's bundled `RuntimeClient` to call `agentSession.reveal`, checks the receipt, then activates Orca. This adapter requires the local packaged app; remote native chat focus is not supported. If the installed runtime client is unavailable or its API changes, the tap fails with a log message.
 
 ## How it maps to the creature
 

@@ -44,6 +44,8 @@ make sim-live
 
 The daemon polls Orca every two seconds and sends versioned JSON through a raw pseudo-terminal. The simulator renders `idle`, `working`, `needs_me`, and a four-second `just_finished` expression using shared firmware code. The status below the puck shows whether Orca is connected, unavailable, or the link is stale. Closing the window stops the daemon.
 
+When the pet shows `needs_me`, click anywhere on the round screen to open the oldest waiting or blocked session in Orca. The cursor and control hint change when this action is available. Other states keep the petting interaction. The daemon rechecks sessions before focusing one. Terminal sessions and native chats on this Mac are supported.
+
 `ORCA_CLI_COMMAND` can select the Orca executable. Session prompts and terminal content are not sent to the simulator or stored. The protocol is in [docs/protocol.md](docs/protocol.md).
 
 ```sh
@@ -57,7 +59,7 @@ Validation screenshots and logs are saved under `sim/build/validation/`. To capt
 python3 sim/live.py --screenshot /tmp/puckling.png
 ```
 
-This implements the session-state path in the MVP. Token feeding, hunger, sounds, tap-to-focus, persistence, and physical USB serial integration are still pending.
+This implements session state and tap-to-focus in the simulator. Token feeding, hunger, sounds, persistence, and physical USB serial integration are still pending.
 
 ### Flash the puck
 
@@ -83,7 +85,7 @@ Details for each step are in [docs/creature.md](docs/creature.md) and [docs/orca
 
 ## Docs
 
-- [docs/architecture.md](docs/architecture.md): how the puck and the daemon fit together, and open decisions.
+- [docs/architecture.md](docs/architecture.md): how the puck and the daemon fit together, and implementation choices.
 - [docs/hardware.md](docs/hardware.md): the board, its pins, and board-specific traps.
 - [docs/prior-art.md](docs/prior-art.md): other projects for this board and what to take from each.
 - [docs/creature.md](docs/creature.md): the creature: food, behaviour, calm rules, growth, navigation.
