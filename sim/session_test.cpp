@@ -37,4 +37,23 @@ int main() {
     assert(feed(stream, std::string("{\"version\":1,\"type\":\"state\",\"state\":\"") + state + "\",\"connected\":true}\n", snapshot));
     assert(std::string(sessionName(snapshot.state)) == state);
   }
+
+  SessionReceiver receiver;
+  assert(!receiver.hasSnapshot() && !receiver.canFocus(0));
+  auto receive = [&](const std::string &line, uint32_t now) {
+    for (char byte : line) receiver.feed(byte, now);
+  };
+  receive("{\"version\":1,\"type\":\"state\",\"state\":\"needs_me\",\"connected\":true}\n", 100);
+  assert(receiver.hasSnapshot() && receiver.canFocus(8100));
+  assert(!receiver.canFocus(8101));
+  receive("invalid\n", 8101);
+  assert(!receiver.canFocus(8101));
+  receive("{\"version\":1,\"type\":\"state\",\"state\":\"needs_me\",\"connected\":false}\n", 8200);
+  assert(receiver.fresh(8200) && !receiver.canFocus(8200));
+  receive("{\"version\":1,\"type\":\"state\",\"state\":\"working\",\"connected\":true}\n", 8300);
+  assert(!receiver.canFocus(8300));
+  assert(receiver.snapshot().state == SessionState::Working);
+  receive("{\"version\":1,\"type\":\"state\",\"state\":\"needs_me\",\"connected\":true}\n", UINT32_MAX - 100);
+  assert(receiver.canFocus(100));
+  assert(!receiver.canFocus(8000));
 }

@@ -92,6 +92,17 @@ bool StateStream::feed(char byte, SessionSnapshot &snapshot) {
   return false;
 }
 
+bool SessionReceiver::feed(char byte, uint32_t now) {
+  if (!stream.feed(byte, current)) return false;
+  received = true;
+  lastReceived = now;
+  return true;
+}
+
+bool SessionReceiver::canFocus(uint32_t now) const {
+  return fresh(now) && current.connected && current.state == SessionState::NeedsMe;
+}
+
 const char *sessionName(SessionState state) {
   switch (state) {
     case SessionState::Working: return "working";
