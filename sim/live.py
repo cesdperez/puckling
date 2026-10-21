@@ -36,7 +36,7 @@ def main():
     children = []
     try:
         daemon = subprocess.Popen(
-            ["bun", "daemon/main.ts"], cwd=root, stdout=master, start_new_session=True,
+            ["bun", "daemon/main.ts"], cwd=root, stdin=master, stdout=master, start_new_session=True,
         )
         children.append(daemon)
         simulator = subprocess.Popen(

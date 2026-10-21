@@ -7,7 +7,7 @@
 
 StateLink::StateLink(const char *path) {
   if (!path) return;
-  fd = open(path, O_RDONLY | O_NONBLOCK | O_NOCTTY);
+  fd = open(path, O_RDWR | O_NONBLOCK | O_NOCTTY);
   if (fd < 0) { perror(path); return; }
   termios settings;
   if (tcgetattr(fd, &settings) != 0) { perror("link termios"); close(fd); fd = -1; return; }
@@ -19,6 +19,7 @@ StateLink::StateLink(const char *path) {
 StateLink::~StateLink() { if (fd >= 0) close(fd); }
 
 void StateLink::poll(double now) {
+  flush();
   if (fd < 0) return;
   char bytes[512];
   for (int batch = 0; batch < 16; batch++) {
@@ -37,6 +38,33 @@ void StateLink::poll(double now) {
       lastReceived = now;
     }
   }
+}
+
+bool StateLink::canFocus(double now) const {
+  return fd >= 0 && received && now - lastReceived <= 8 && current.connected && current.state == SessionState::NeedsMe;
+}
+
+bool StateLink::tap(double now) {
+  if (!canFocus(now)) return false;
+  if (outgoing.empty()) outgoing = TAP_MESSAGE;
+  flush();
+  return fd >= 0;
+}
+
+void StateLink::flush() {
+  if (fd < 0 || outgoing.empty()) return;
+  ssize_t count = write(fd, outgoing.data() + sent, outgoing.size() - sent);
+  if (count < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) return;
+    perror("tap link");
+    close(fd);
+    fd = -1;
+    outgoing.clear();
+    sent = 0;
+    return;
+  }
+  sent += count;
+  if (sent == outgoing.size()) { outgoing.clear(); sent = 0; }
 }
 
 const char *StateLink::status(double now) const {

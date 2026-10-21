@@ -14,8 +14,13 @@ build/session-test: session_test.cpp $(FIRMWARE)/session.cpp $(FIRMWARE)/session
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) session_test.cpp $(FIRMWARE)/session.cpp -o $@
 
-test: build/session-test
+build/link-test: link_test.cpp link.cpp link.h $(FIRMWARE)/session.cpp $(FIRMWARE)/session.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) link_test.cpp link.cpp $(FIRMWARE)/session.cpp -o $@
+
+test: build/session-test build/link-test
 	./build/session-test
+	./build/link-test
 
 run: build/puckling-sim
 	./build/puckling-sim

@@ -100,7 +100,8 @@ static void drawHud(const Puck &puck, const StateLink &link) {
     DrawText(text, 20, y, 16, LIGHTGRAY);
     y += 20;
   };
-  line("click screen: poke    drag bezel / arrows: turn puck (shift: fast)");
+  line(link.canFocus(GetTime()) ? "click screen: open waiting session    drag bezel / arrows: turn" :
+                                "click screen: pet    drag bezel / arrows: turn (shift: fast)");
   line("F: upright / flat on desk    V: view turns with puck / panel fixed");
   line("B: redraw bounds    S: slow motion    space: pause");
   line(TextFormat("%s   %s", sessionName(link.snapshot().state), link.status(GetTime())));
@@ -124,15 +125,19 @@ int main(int argc, char **argv) {
   const char *screenshot = nullptr;
   const char *linkPath = nullptr;
   float captureAfter = 2;
+  float tapAfter = 0;
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) screenshot = argv[++i];
     else if (strcmp(argv[i], "--link") == 0 && i + 1 < argc) linkPath = argv[++i];
-    else if (strcmp(argv[i], "--capture-after") == 0 && i + 1 < argc) {
+    else if ((strcmp(argv[i], "--capture-after") == 0 || strcmp(argv[i], "--tap-after") == 0) && i + 1 < argc) {
+      bool tap = strcmp(argv[i], "--tap-after") == 0;
       char *end;
-      captureAfter = strtof(argv[++i], &end);
-      if (*end || !isfinite(captureAfter) || captureAfter <= 0) return 1;
+      float seconds = strtof(argv[++i], &end);
+      if (*end || !isfinite(seconds) || seconds <= 0) return 1;
+      if (tap) tapAfter = seconds;
+      else captureAfter = seconds;
     } else {
-      fprintf(stderr, "Usage: %s [--link tty] [--screenshot path] [--capture-after seconds]\n", argv[0]);
+      fprintf(stderr, "Usage: %s [--link tty] [--screenshot path] [--capture-after seconds] [--tap-after seconds]\n", argv[0]);
       return 1;
     }
   }
@@ -155,6 +160,8 @@ int main(int argc, char **argv) {
   bool saved = true;
   while (!WindowShouldClose()) {
     link.poll(GetTime());
+    SetMouseCursor(link.canFocus(GetTime()) && distanceFromCenter(GetMousePosition()) <= RADIUS ?
+                   MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
     handleToggles(puck);
     float dt = puck.paused ? 0 : min(0.05f, GetFrameTime()) * puck.timeScale;
 
@@ -164,6 +171,16 @@ int main(int argc, char **argv) {
 
     Poke poke;
     bool poked = pokeFromClick(puck, poke);
+    if (tapAfter > 0 && elapsed >= tapAfter) {
+      poke = {233, 360};
+      poked = true;
+      tapAfter = 0;
+    }
+    if (poked && link.tap(GetTime())) {
+      printf("tap action=focus\n");
+      fflush(stdout);
+      poked = false;
+    }
     Pose pose = stepWorld(senseMotion(puck, dt > 0 ? turned / dt : 0), poked ? &poke : nullptr, dt);
     applySession(pose, link.snapshot().state);
 

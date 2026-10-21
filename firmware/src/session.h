@@ -9,6 +9,8 @@ struct SessionSnapshot {
   bool connected = false;
 };
 
+constexpr char TAP_MESSAGE[] = "{\"version\":1,\"type\":\"input\",\"event\":\"tap\"}\n";
+
 class StateStream {
  public:
   bool feed(char byte, SessionSnapshot &snapshot);
