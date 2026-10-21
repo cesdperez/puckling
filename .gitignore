@@ -1,0 +1,3 @@
+sim/build/
+__pycache__/
+firmware/.pio/
