@@ -19,8 +19,9 @@ describe("Orca snapshots", () => {
   });
 
   test("ignores archived worktrees", () => {
-    const data = response();
-    data.result.worktrees.push({ ...data.result.worktrees[0], isArchived: true, agents: [{}] } as any);
+    const data = { ok: true, result: { ...response().result, worktrees: [
+      { ...response().result.worktrees[0], isArchived: true, agents: [{}] },
+    ] } };
     expect(parseOrca(data)).toEqual([]);
   });
 

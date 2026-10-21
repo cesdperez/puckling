@@ -18,16 +18,15 @@
 
 - **UI is reviewed on the Mac before it is flashed.** Three stages:
   1. Clickable HTML mockups on a 466x466 round canvas to pick a direction. Throwaway code, limited to what LVGL can draw on this chip (flat shapes, arcs, sprites, simple tweens).
-  2. The simulator in `sim/`: the firmware's drawing and world code compiled for macOS against a small Arduino and Arduino_GFX shim, shown with raylib. Mouse and keys stand in for touch and the IMU. Later the real daemon drives it over a virtual serial pair (`socat` pty). Approval happens here.
+  2. The simulator in `sim/`: the firmware's drawing and world code compiled for macOS against a small Arduino and Arduino_GFX shim, shown with raylib. Mouse and keys stand in for touch and the IMU. The real daemon drives it over a raw pseudo-terminal created by `sim/live.py`, using Python's standard library. Approval happens here.
   3. Flash approved builds only. Check on the device what the simulator cannot show: AMOLED color, touch and IMU feel, frame rate.
 
   Reason: design iteration is minutes in a browser and slow on hardware. The simulator runs the same C code as the puck, so what gets approved is what gets flashed. Only hardware access (`display.cpp`, `sensors.cpp`) stays out of the simulator, so keep drawing and behaviour out of those files. Full ESP32-S3 emulators (Wokwi, Espressif QEMU) were rejected because neither emulates the CO5300 display or CST9217 touch.
 
-## Open decisions
+- **The first link is USB serial.** The puck sits on the desk plugged in, so no pairing or credentials are needed. The simulator validates the state protocol over a pseudo-terminal before the physical serial integration. Wi-Fi remains a later option for battery use.
 
-| Decision | Options | Lean |
-|---|---|---|
-| Link | USB serial, Wi-Fi WebSocket, BLE | **USB serial** for the POC: the puck sits on the desk plugged in, no pairing or credentials. Wi-Fi WebSocket next, so it works on battery. |
-| Firmware framework | Arduino-ESP32 + LVGL 9 (PlatformIO), ESP-IDF + LVGL | **PlatformIO with the Arduino framework.** Builds and flashes from the CLI, matches the Waveshare Arduino examples and TamaPoke. Move to ESP-IDF only if we hit a limit. |
-| Graphics | LVGL, raw Arduino_GFX | **LVGL** for widgets and animation. Sprites as LVGL images. |
-| Daemon language | Bun/TypeScript, Swift | **Bun/TypeScript.** Fast to write, easy JSON and serial. Swift only if we want a menu bar or notch UI. |
+- **Firmware uses PlatformIO with Arduino-ESP32.** It matches the board examples and the working firmware. ESP-IDF is an option if the Arduino framework reaches a limit.
+
+- **The MVP keeps raw Arduino_GFX.** The existing renderer supports the procedural pet and all four session expressions, and the simulator compiles it unchanged. LVGL can be reconsidered when widgets or navigation need it.
+
+- **The daemon uses Bun/TypeScript.** JSON parsing, subprocess polling, and tests need no package dependencies. Swift can be reconsidered for a native Mac interface.

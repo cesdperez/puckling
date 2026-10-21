@@ -34,6 +34,31 @@ The window lists its controls. Click the screen to poke the pet, drag the bezel 
 
 The simulator compiles `firmware/src/pet.cpp` and `world.cpp` as they are. Changes to drawing or behaviour show up after `make sim`, with no flash needed.
 
+### Live Orca sessions
+
+With [Bun](https://bun.sh), Python 3, and Orca installed and running:
+
+```sh
+make sim-live
+```
+
+The daemon polls Orca every two seconds and sends versioned JSON through a raw pseudo-terminal. The simulator renders `idle`, `working`, `needs_me`, and a four-second `just_finished` expression using shared firmware code. The status below the puck shows whether Orca is connected, unavailable, or the link is stale. Closing the window stops the daemon.
+
+`ORCA_CLI_COMMAND` can select the Orca executable. Session prompts and terminal content are not sent to the simulator or stored. The protocol is in [docs/protocol.md](docs/protocol.md).
+
+```sh
+make test          # daemon and shared protocol tests, no window
+make validate-sim  # five windowed checks with synthetic Orca replies and screenshots
+```
+
+Validation screenshots and logs are saved under `sim/build/validation/`. To capture a live session:
+
+```sh
+python3 sim/live.py --screenshot /tmp/puckling.png
+```
+
+This implements the session-state path in the MVP. Token feeding, hunger, sounds, tap-to-focus, persistence, and physical USB serial integration are still pending.
+
 ### Flash the puck
 
 ```sh
@@ -64,6 +89,7 @@ Details for each step are in [docs/creature.md](docs/creature.md) and [docs/orca
 - [docs/creature.md](docs/creature.md): the creature: food, behaviour, calm rules, growth, navigation.
 - [docs/orca.md](docs/orca.md): what Orca exposes and how it maps to the creature.
 - [docs/mvp.md](docs/mvp.md): the first build and when it is done.
+- [docs/protocol.md](docs/protocol.md): state messages, precedence, and connection handling.
 
 ## License
 
