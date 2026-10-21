@@ -8,7 +8,40 @@ The creature lives on a puck next to my keyboard. It feeds on the tokens my Clau
 
 - **Firmware** (`firmware/`): runs on the puck. Draws screens, plays sounds, reads touch and the IMU, and talks to the Mac. It holds no business logic.
 - **Daemon** (`daemon/`): runs on the Mac. Reads token usage and Orca state, owns the creature's state, and pushes frames of state to the puck.
-- **Simulator** (`sim/`): runs the firmware's pet and world code in a window on the Mac. `brew install raylib`, then `make -C sim run`. Controls are listed in the window.
+- **Simulator** (`sim/`): runs the firmware's pet and world code in a window on the Mac.
+
+## Setup
+
+You need a Mac with [Homebrew](https://brew.sh) and the Xcode command line tools (`xcode-select --install`). The puck itself is optional: the simulator runs without it.
+
+```sh
+git clone https://github.com/cesdperez/puckling.git
+cd puckling
+make setup
+```
+
+`make setup` checks the prerequisites and installs raylib and PlatformIO with Homebrew.
+
+The board is the Waveshare ESP32-S3-Touch-AMOLED-1.75C. The plain 1.75 has different pins, see [docs/hardware.md](docs/hardware.md).
+
+### Simulator
+
+```sh
+make sim
+```
+
+The window lists its controls. Click the screen to poke the pet, drag the bezel or use the arrow keys to turn the puck. `./sim/build/puckling-sim --screenshot out.png` saves a frame after 2 seconds and exits.
+
+The simulator compiles `firmware/src/pet.cpp` and `world.cpp` as they are. Changes to drawing or behaviour show up after `make sim`, with no flash needed.
+
+### Flash the puck
+
+```sh
+make flash
+make monitor
+```
+
+Plug the puck in over USB-C first. PlatformIO finds the port and downloads the ESP32 toolchain and libraries on the first build. The monitor prints frame rate, sensor status and pokes every 2 seconds. If the upload cannot connect, hold BOOT while you plug the puck in, then upload again.
 
 ## Roadmap
 
@@ -35,3 +68,7 @@ Details for each step are in [docs/creature.md](docs/creature.md) and [docs/orca
 ## Restoring Watt
 
 This firmware replaces Watt on the puck. To go back, flash Watt from https://watt.sourabhdaroji.com/ in Chrome or Edge.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

@@ -22,4 +22,4 @@ Growth stages, evolution, poop, babies, more screens, navigation, menus, approve
 - Sounds play once per event, and several events close together give one sound.
 - Tap on `needs_me` brings the right terminal to the front on the Mac.
 - Unplugging and replugging the puck resumes at the right state.
-- It runs in the SDL simulator first, then on the puck.
+- It runs in the simulator (`sim/`) first, then on the puck.
