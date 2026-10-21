@@ -65,10 +65,6 @@ Details for each step are in [docs/creature.md](docs/creature.md) and [docs/orca
 - [docs/orca.md](docs/orca.md): what Orca exposes and how it maps to the creature.
 - [docs/mvp.md](docs/mvp.md): the first build and when it is done.
 
-## Restoring Watt
-
-This firmware replaces Watt on the puck. To go back, flash Watt from https://watt.sourabhdaroji.com/ in Chrome or Edge.
-
 ## License
 
 MIT, see [LICENSE](LICENSE).
