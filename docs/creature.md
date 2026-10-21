@@ -67,7 +67,7 @@ The daemon reduces all Orca agents to what the creature does. See [orca.md](orca
 
 MVP:
 
-- Tap: if a session needs me, switch to it on the Mac. Otherwise pet it.
+- Tap: open the oldest session that needs me, otherwise the most recently started working session, otherwise the latest finished session. Without a live link, pet the creature.
 
 Later:
 
