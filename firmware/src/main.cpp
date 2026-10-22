@@ -22,8 +22,9 @@ void loop() {
   static char outgoing[256];
   static size_t sent=0, length=0;
   char message[256];
-  if(ui.touch(sample,now,message,sizeof(message)) && length==0) {
-    strcpy(outgoing,message);length=strlen(outgoing);sent=0;
+  if(ui.touch(sample,now,message,sizeof(message))) {
+    if(length==0){strcpy(outgoing,message);length=strlen(outgoing);sent=0;}
+    else ui.transportFailed();
   }
   if(length && Serial.availableForWrite()>0) {
     size_t chunk=min(length-sent,size_t(Serial.availableForWrite()));

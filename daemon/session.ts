@@ -73,7 +73,7 @@ const actionable = (a: Agent) => [0, 1, 2].includes(cardState(a));
 export const eventKey = (a: Agent) => `${a.state}/${a.stateStartedAt ?? ""}/${a.outcome ?? ""}`;
 export class SessionModel {
   private salt = randomBytes(16).toString("hex");
-  private previous = new Map<string, string>();
+  private previous = new Map<string, Agent>();
   private alerts = new Map<string, { event: string; seen: boolean }>();
   private agents = new Map<string, Agent>();
   private queriedAt = -Infinity;
@@ -92,13 +92,18 @@ export class SessionModel {
     for (const id of this.alerts.keys()) if (!live.has(id)) this.alerts.delete(id);
     for (const a of agents) {
       const event = eventKey(a), old = this.previous.get(a.id), alert = this.alerts.get(a.id);
-      const completed = !this.baseline && old !== undefined && old !== event && [3, 7].includes(cardState(a));
+      const completed = !this.baseline && old !== undefined && eventKey(old) !== event &&
+        (old.state !== "done" || a.stateStartedAt !== undefined && old.stateStartedAt !== undefined && a.stateStartedAt !== old.stateStartedAt) &&
+        [3, 7].includes(cardState(a));
       if ((actionable(a) || completed) && alert?.event !== event) {
         this.alerts.set(a.id, { event, seen: false });
-        this.pendingCue = true;
-      } else if (!actionable(a) && !completed && alert?.event !== event) this.alerts.delete(a.id);
+        this.pendingCue ||= now - this.lastCue >= 3000;
+      } else if (!actionable(a) && !completed && alert?.event !== event) {
+        if (alert && a.state === "done" && old?.state === "done" && a.stateStartedAt === old.stateStartedAt && [3,7].includes(cardState(a))) alert.event = event;
+        else this.alerts.delete(a.id);
+      }
     }
-    this.previous = new Map(agents.map(a => [a.id, eventKey(a)]));
+    this.previous = new Map(agents.map(a => [a.id, a]));
     this.agents = new Map(agents.map(a => [this.token(a), a]));
     this.queriedAt = now; this.connected = true; this.baseline = false;
   }
@@ -147,7 +152,7 @@ export class SessionModel {
     for (const a of recent) { if (chosen.size === MAX_SESSIONS) break; chosen.add(a); }
     const sessions: Card[] = recent.filter(a => chosen.has(a)).map(a => [this.token(a), a.project ?? "Project",
       // The suffix disambiguates identical or missing titles without exposing paths.
-      textLabel(a.title, 12, "Session") + " " + this.token(a).slice(0, 8), a.agentType ?? "Agent", cardState(a),
+      textLabel(a.title, 12, "Session") + " " + createHash("sha256").update(a.id).digest("hex").slice(0, 8), a.agentType ?? "Agent", cardState(a),
       !!alert(a), alert(a)?.seen ?? false, !(a.paneKey?.startsWith("structured-agent-session-") && a.hostId !== "local"),
       cardState(a) === 0 ? "Waiting for your input" : cardState(a) === 1 ? "Needs your attention" :
       cardState(a) === 2 ? "Run reported failure" : cardState(a) === 7 ? "Outcome not reported" : "", recent.indexOf(a) + 1]);

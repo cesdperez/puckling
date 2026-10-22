@@ -1,11 +1,13 @@
 import { STALE_MS, SessionModel, eventKey, type Agent, type Snapshot } from "./session";
 import type { DeviceInput } from "./input";
 
+export class TargetUnavailable extends Error {}
+
 export function terminalForAgent(agent: Agent, terminals: readonly Record<string, unknown>[]): string {
   const matches = terminals.filter(terminal => terminal.executionHostId === agent.hostId &&
     terminal.worktreeId === agent.worktreeId && `${terminal.tabId}:${terminal.leafId}` === agent.paneKey &&
     terminal.connected === true && terminal.orphaned === false && typeof terminal.handle === "string");
-  if (matches.length !== 1) throw new Error("Selected session has no unique live terminal");
+  if (matches.length !== 1) throw new TargetUnavailable("Selected session has no unique live terminal");
   return matches[0].handle as string;
 }
 
@@ -48,8 +50,8 @@ export class FocusController {
       await this.focus(target);
       if (eventKey(target) === offer.ids.get(input.id)) this.model.acknowledge(input.id, offer.ids.get(input.id));
       await report("opened"); return true;
-    } catch {
-      await report("retry"); return false;
+    } catch (error) {
+      await report(error instanceof TargetUnavailable ? "unavailable" : "retry"); return false;
     } finally { this.busy = false; }
   }
 }

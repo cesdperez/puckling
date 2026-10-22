@@ -39,6 +39,7 @@ void text(Arduino_GFX *g,const char *s,int y,int scale,uint16_t color,int center
 uint16_t color(SessionState s){return s==SessionState::Input||s==SessionState::Attention?AMBER:s==SessionState::Failed?CORAL:s==SessionState::Finished?MINT:BLUE;}
 void icon(Arduino_GFX *g,SessionState s,int x,int y,uint16_t c){
   if(s==SessionState::Input||s==SessionState::Attention){g->drawRoundRect(x,y,24,18,5,c);g->fillTriangle(x+4,y+17,x+4,y+24,x+11,y+17,c);}
+  else if(s==SessionState::Unknown||s==SessionState::Ended){g->drawRect(x+4,y,17,24,c);g->drawLine(x+8,y+9,x+17,y+9,c);g->drawLine(x+8,y+15,x+17,y+15,c);}
   else if(s==SessionState::Monitoring){for(int i=0;i<3;i++)g->fillRect(x+i*8,y+16-i*6,5,8+i*6,c);}
   else {g->drawCircle(x+12,y+12,12,c);if(s==SessionState::Failed){g->fillRect(x+11,y+5,3,10,c);g->fillRect(x+11,y+18,3,3,c);}
     else if(s==SessionState::Finished){g->drawLine(x+5,y+12,x+10,y+17,c);g->drawLine(x+10,y+17,x+20,y+7,c);}
@@ -52,7 +53,8 @@ void pebble(Arduino_GFX *g,SessionState state,uint32_t now,bool calm){
   for(int y=0;y<44;y++)for(int x=0;x<64;x++) {
     int n=PEBBLE[pose][y][x]-'0';if(!n)continue;
     if((now%4700)>4530 && x>=45&&x<=47&&y>=24&&y<=28 && pose!=1)n=y==27?7:2;
-    g->fillRect(105+x*4,y0+y*4,4,4,palette[n]);
+    int tail=(x<14 && now%9000<800)?((now/200)%2?4:0):0;
+    g->fillRect(105+x*4,y0+y*4+tail,4,4,palette[n]);
   }
   if(calm && state==SessionState::Finished && now%8000<1200) {g->fillRect(370,160,4,12,MINT);g->fillRect(366,164,12,4,MINT);}
 }
@@ -70,21 +72,30 @@ void CompanionUI::update(const SessionSnapshot &snapshot,bool fresh,uint32_t sou
   }
   if(request && state.request==request && !strcmp(state.target,pressedId) && state.feedback!=Feedback::None && state.feedback!=Feedback::Selected)feedback=state.feedback;
   if(feedback==Feedback::Opening && now-pendingSince>12000)feedback=Feedback::Retry;
+  if(pendingView>=0 && now-pendingSince>8000)pendingView=-1;
+  int i=index();
+  if(i>=0 && (strcmp(expressionId,state.sessions[i].id) || expressionState!=state.sessions[i].state)){
+    strcpy(expressionId,state.sessions[i].id);expressionState=state.sessions[i].state;expressionSince=now;
+  }
 }
 bool CompanionUI::step(int direction,char *message,size_t size){
   if(!live || pendingView>=0 || feedback==Feedback::Opening)return false;
-  request=request==2147483647?1:request+1;pendingView=page;
+  request=request==2147483647?1:request+1;pendingView=page;pendingSince=lastInteraction;
   return stepMessage(message,size,selected[page],state.seq,request,page,direction)>0;
 }
 bool CompanionUI::touch(TouchSample sample,uint32_t now,char *message,size_t size){
   if(sample.down){
-    if(!down){down=true;dragged=false;maxTravel=0;startX=sample.x;startY=sample.y;pressAt=now;pressedSeq=state.seq;strcpy(pressedId,selected[page]);}
+    if(!down){if((sample.x-233)*(sample.x-233)+(sample.y-233)*(sample.y-233)>233*233)return false;down=true;dragged=false;maxTravel=0;startX=sample.x;startY=sample.y;pressAt=now;pressedSeq=state.seq;strcpy(pressedId,selected[page]);}
     int dx=abs(sample.x-startX),dy=abs(sample.y-startY);if(dx>maxTravel)maxTravel=dx;if(dy>maxTravel)maxTravel=dy;
     if(maxTravel>16)dragged=true;
     lastInteraction=now;return false;
   }
   if(!down)return false;down=false;lastInteraction=now;
+  if(pendingView>=0 && state.request==request && state.feedback==Feedback::Selected){
+    strcpy(selected[pendingView],state.target);pendingView=-1;feedback=Feedback::None;
+  }
   int dx=sample.x-startX,dy=sample.y-startY;
+  if(abs(dx)>16||abs(dy)>16)dragged=true;
   if(dragged){
     if(abs(dx)>=48 && abs(dx)>abs(dy)*1.25f){page=(page+(dx<0?1:2))%3;feedback=Feedback::None;selectInitial();}
     else if(abs(dy)>=40 && abs(dy)>abs(dx)*1.25f)return step(dy<0?1:-1,message,size);
@@ -95,11 +106,7 @@ bool CompanionUI::touch(TouchSample sample,uint32_t now,char *message,size_t siz
   if(startY<366||startY>418||startX<104||startX>362)return false;
   if(page==0&&(!state.attention||!selected[page][0])){page=2;selectInitial();return false;}
   if(!live || pendingView>=0 || now-lastUpdate+age>8000 || feedback==Feedback::Opening || strcmp(pressedId,selected[page]))return false;
-  if(page==0 && feedback==Feedback::Opened){
-    for(int j=0;j<state.count;j++)if(state.sessions[j].attention&&!state.sessions[j].seen&&strcmp(state.sessions[j].id,selected[page])){
-      return step(1,message,size);
-    }
-  }
+  if(page==0 && feedback==Feedback::Opened && state.attention>1)return step(1,message,size);
   int i=index();if(i<0){feedback=Feedback::Unavailable;return false;}
   if(!state.sessions[i].supported){feedback=Feedback::Unsupported;return false;}
   pendingView=-1;request=request==2147483647?1:request+1;feedback=Feedback::Opening;pendingSince=now;
@@ -123,7 +130,7 @@ void CompanionUI::draw(Arduino_GFX *g,uint32_t now)const{
     const char *label=sessionName(c->state);int w=(int(strlen(label))*6-1)*3;
     icon(g,c->state,233-w/2-34,70,color(c->state));text(g,label,74,3,color(c->state),247);
   }else text(g,unavailable()?"Session unavailable":page==1?"All clear":"No sessions",76,2,WHITE);
-  pebble(g,pose,now,connected);
+  pebble(g,pose==SessionState::Finished && now-expressionSince>1800?SessionState::Unknown:pose,now-expressionSince,connected);
   int eligibleCount=0,position=0;
   for(int j=0;j<state.count;j++)if(eligible(j)){eligibleCount++;if(i==j)position=eligibleCount;}
   if((page==2?state.total:state.attention)>1||unavailable()){
@@ -150,7 +157,7 @@ void CompanionUI::draw(Arduino_GFX *g,uint32_t now)const{
   if(feedback==Feedback::Opening)action="Opening...";
   else if(feedback==Feedback::Opened){
     action="Opened";
-    if(page==0&&now-pendingSince>1500)for(int j=0;j<state.count;j++)if(state.sessions[j].attention&&!state.sessions[j].seen&&strcmp(state.sessions[j].id,selected[page]))action="Next request";
+    if(page==0&&now-pendingSince>1500&&state.attention>1)action="Next request";
   }
   else if(feedback==Feedback::Retry)action="Retry open";
   else if(feedback==Feedback::Unavailable)action="Target unavailable";
@@ -158,6 +165,8 @@ void CompanionUI::draw(Arduino_GFX *g,uint32_t now)const{
   else if(!connected)action="Offline";
   else if(unavailable())action="Choose another";
   else if(!c)action=page==0?"Browse sessions":page==1?"No requests":"No sessions";
+  if(page==0&&!state.attention&&feedback!=Feedback::Opening&&now-pendingSince>1500)action="Browse sessions";
+  if(!connected)action="Offline";
   bool enabled=connected&&!unavailable()&&(c?c->supported:page==0);
   g->fillRoundRect(104,366,258,52,26,enabled?WHITE:GRAPHITE);text(g,action,385,2,enabled?0:MUTED);
   if(page!=0 && eligibleCount){position=c?c->position:0;snprintf(line,sizeof(line),"%d / %d",position,page==1?state.attention:state.total);text(g,line,426,2,MUTED);}

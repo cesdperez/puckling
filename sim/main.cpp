@@ -39,8 +39,8 @@ int main(int argc,char **argv){
     if(IsMouseButtonDown(MOUSE_BUTTON_LEFT)&&sample.down){sample.x=mouse.x-87;sample.y=mouse.y-47;}
     if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT))sample.down=false;
     while(action<actions.size()&&elapsed>=actions[action].at){const auto &a=actions[action++];sample={a.down,a.x,a.y};
-      char message[256];if(ui.touch(sample,ms,message,sizeof(message))&&link.send(message)){printf("input action=open\n");fflush(stdout);}}
-    char message[256];if(ui.touch(sample,ms,message,sizeof(message))&&link.send(message)){printf("input action=open\n");fflush(stdout);}
+      char message[256];if(ui.touch(sample,ms,message,sizeof(message))){if(link.send(message)){printf("input action=%s\n",strstr(message,"step")?"step":"open");fflush(stdout);}else ui.transportFailed();}}
+    char message[256];if(ui.touch(sample,ms,message,sizeof(message))){if(link.send(message)){printf("input action=%s\n",strstr(message,"step")?"step":"open");fflush(stdout);}else ui.transportFailed();}
     if(lastPage!=ui.pageIndex()){printf("page=%d\n",ui.pageIndex());fflush(stdout);lastPage=ui.pageIndex();}
     ui.draw(&gfx,ms);UpdateTexture(panel,gfx.framebuffer());
     BeginDrawing();ClearBackground({28,29,34,255});
@@ -49,7 +49,10 @@ int main(int argc,char **argv){
     DrawText("Swipe horizontally: screens",30,551,19,LIGHTGRAY);
     DrawText("Swipe vertically / arrows: cards. Tap pill: open.",30,579,18,LIGHTGRAY);
     DrawText(link.status(now),30,608,16,GRAY);EndDrawing();
-    elapsed+=GetFrameTime();if(capture&&elapsed>after){saved=screenshot(capture);break;}
+    elapsed+=GetFrameTime();if(capture&&elapsed>after){
+      printf("capture page=%d state=%s position=%d feedback=%d source=%s\n",ui.pageIndex(),ui.selectedPosition()?sessionName(ui.selectedState()):"none",ui.selectedPosition(),int(ui.actionFeedback()),link.status(now));fflush(stdout);
+      saved=screenshot(capture);break;
+    }
   }
   UnloadTexture(panel);CloseWindow();return saved?0:1;
 }

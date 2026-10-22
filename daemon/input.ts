@@ -10,7 +10,10 @@ export class InputStream {
       if (byte === 10) {
         if (!this.discarded) {
           try {
+            if (this.line.includes("\\")) throw new Error("Escaped input field");
             const a = JSON.parse(this.line);
+            const keys = [...this.line.matchAll(/"([a-z]+)"\s*:/g)].map(match => match[1]);
+            if (new Set(keys).size !== keys.length) throw new Error("Duplicate input field");
             if (a?.version === 2 && a.type === "input" && ["open", "step"].includes(a.event) && typeof a.id === "string" && (a.event === "step" && a.id === "" || /^[a-f0-9]{16}$/.test(a.id)) &&
               Number.isSafeInteger(a.seq) && a.seq > 0 && a.seq <= 2147483647 &&
               Number.isSafeInteger(a.request) && a.request > 0 && a.request <= 2147483647 && (a.event === "open" ? Object.keys(a).length === 6 : Object.keys(a).length === 8 && [0,1,2].includes(a.view) && [-1,1].includes(a.direction))) events.push(a);

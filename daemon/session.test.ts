@@ -60,7 +60,8 @@ test("stable ties, 24 hour history, bounded frames, explicit truncation and fres
 test("cues batch new events and acknowledgements do not repeat a cue", () => {
   const m=new SessionModel();m.update([agent("a","waiting")],1000);expect(m.snapshot(1000).cue).toBe(1);
   m.update([agent("a","waiting"),agent("b","waiting")],2000);expect(m.snapshot(2000).cue).toBe(1);
-  let s=m.snapshot(4000);expect(s.cue).toBe(2);m.acknowledge(s.sessions[0][0]);expect(m.snapshot(5000).cue).toBe(2);
+  let s=m.snapshot(4000);expect(s.cue).toBe(1);m.acknowledge(s.sessions[0][0]);expect(m.snapshot(5000).cue).toBe(1);
+  m.update([agent("a","waiting"),agent("b","waiting"),agent("c","blocked")],6000);expect(m.snapshot(6000).cue).toBe(2);
 });
 
 test("all sessions remain reachable through bounded windows while page selections stay pinned", () => {
@@ -75,4 +76,13 @@ test("all sessions remain reachable through bounded windows while page selection
   expect(reached.size).toBe(90);
   m.update([agent("new","waiting",{stateStartedAt:0}),...rows],now+1);
   expect(m.snapshot(now+1).sessions.some(c=>c[0]===home)).toBe(true);
+});
+
+test("late success metadata never turns historical done into a fresh alert", () => {
+  const m=new SessionModel();m.update([agent("a","done")],1000);
+  m.update([agent("a","done",{outcome:"success"})],2000);expect(m.snapshot(2000).attention).toBe(0);
+  m.update([agent("a","working")],3000);m.update([agent("a","done",{stateStartedAt:4000})],4000);
+  expect(m.snapshot(4000).attention).toBe(1);const cue=m.snapshot(4000).cue;
+  m.update([agent("a","done",{stateStartedAt:4000,outcome:"success"})],5000);
+  expect(m.snapshot(5000).attention).toBe(1);expect(m.snapshot(5000).cue).toBe(cue);
 });
