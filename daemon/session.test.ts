@@ -86,3 +86,10 @@ test("late success metadata never turns historical done into a fresh alert", () 
   m.update([agent("a","done",{stateStartedAt:4000,outcome:"success"})],5000);
   expect(m.snapshot(5000).attention).toBe(1);expect(m.snapshot(5000).cue).toBe(cue);
 });
+
+test("initial page identity is explicit even after priority changes before that page is visited",()=>{
+  const m=new SessionModel();m.update([agent("a","working")],1000);const initial=m.snapshot(1000).selection[2];
+  m.update([agent("a","working"),agent("b","waiting")],2000);const s=m.snapshot(2000);
+  expect(s.selection[2]).toBe(initial);expect(s.sessions[0][0]).not.toBe(initial);
+  expect(s.sessions.some(c=>c[0]===s.selection[2])).toBe(true);
+});

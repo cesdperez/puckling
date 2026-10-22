@@ -66,3 +66,9 @@ test("the bundled runtime adapter activates Orca only after a confirmed reveal",
   }
   expect(activated).toEqual([app]);
 });
+
+test("source freshness is checked after terminal discovery and immediately before navigation",async()=>{
+  const commands:string[][]=[];
+  await expect(openSession(target,async args=>{commands.push(args);return terminals;},undefined,()=>false)).rejects.toThrow("stale");
+  expect(commands).toHaveLength(1);expect(commands[0][1]).toBe("list");
+});

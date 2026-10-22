@@ -52,8 +52,8 @@ void pebble(Arduino_GFX *g,SessionState state,uint32_t now,bool calm){
   int y0=112+drift;
   for(int y=0;y<44;y++)for(int x=0;x<64;x++) {
     int n=PEBBLE[pose][y][x]-'0';if(!n)continue;
-    if((now%4700)>4530 && x>=45&&x<=47&&y>=24&&y<=28 && pose!=1)n=y==27?7:2;
-    int tail=(x<14 && now%9000<800)?((now/200)%2?4:0):0;
+    if((now%4700)>4530 && x>=45&&x<=47&&y>=24&&y<=28 && (pose==0||pose==4))n=y==27?7:2;
+    int tail=((pose==0||pose==4) && x<14 && now%9000<800)?((now/200)%2?4:0):0;
     g->fillRect(105+x*4,y0+y*4+tail,4,4,palette[n]);
   }
   if(calm && state==SessionState::Finished && now%8000<1200) {g->fillRect(370,160,4,12,MINT);g->fillRect(366,164,12,4,MINT);}
@@ -62,7 +62,7 @@ void pebble(Arduino_GFX *g,SessionState state,uint32_t now,bool calm){
 int CompanionUI::index()const {for(int i=0;i<state.count;i++)if(!strcmp(selected[page],state.sessions[i].id) && eligible(i))return i;return -1;}
 bool CompanionUI::eligible(int i)const{return page==2 || state.sessions[i].attention;}
 bool CompanionUI::unavailable()const{return selected[page][0]&&index()<0 && !(page==0&&state.attention==0);}
-void CompanionUI::selectInitial(){if(selected[page][0])return;for(int i=0;i<state.count;i++)if(eligible(i)){strcpy(selected[page],state.sessions[i].id);return;}}
+void CompanionUI::selectInitial(){if(!selected[page][0]&&state.selection[page][0])strcpy(selected[page],state.selection[page]);}
 void CompanionUI::update(const SessionSnapshot &snapshot,bool fresh,uint32_t sourceAge,uint32_t now){
   state=snapshot;live=fresh&&state.connected;age=sourceAge;lastUpdate=now;
   if(live && state.cue!=lastCue){lastCue=state.cue;cueUntil=now+900;}
@@ -71,7 +71,7 @@ void CompanionUI::update(const SessionSnapshot &snapshot,bool fresh,uint32_t sou
     strcpy(selected[pendingView],state.target);pendingView=-1;feedback=Feedback::None;
   }
   if(request && state.request==request && !strcmp(state.target,pressedId) && state.feedback!=Feedback::None && state.feedback!=Feedback::Selected)feedback=state.feedback;
-  if(feedback==Feedback::Opening && now-pendingSince>12000)feedback=Feedback::Retry;
+  if(feedback==Feedback::Opening && now-pendingSince>20000)feedback=Feedback::Retry;
   if(pendingView>=0 && now-pendingSince>8000)pendingView=-1;
   int i=index();
   if(i>=0 && (strcmp(expressionId,state.sessions[i].id) || expressionState!=state.sessions[i].state)){
@@ -104,6 +104,7 @@ bool CompanionUI::touch(TouchSample sample,uint32_t now,char *message,size_t siz
   if(now-pressAt>700)return false;
   if(startY>=196&&startY<=256){if(startX>=30&&startX<=90)return step(-1,message,size);else if(startX>=376&&startX<=436)return step(1,message,size);return false;}
   if(startY<366||startY>418||startX<104||startX>362)return false;
+  if(!live || now-lastUpdate+age>8000)return false;
   if(page==0&&(!state.attention||!selected[page][0])){page=2;selectInitial();return false;}
   if(!live || pendingView>=0 || now-lastUpdate+age>8000 || feedback==Feedback::Opening || strcmp(pressedId,selected[page]))return false;
   if(page==0 && feedback==Feedback::Opened && state.attention>1)return step(1,message,size);
@@ -117,12 +118,13 @@ void CompanionUI::draw(Arduino_GFX *g,uint32_t now)const{
   int i=index();const SessionCard *c=i>=0?&state.sessions[i]:nullptr;
   if(page==0&&!state.attention)c=nullptr;
   bool connected=live && now-lastUpdate+age<=8000;
+  bool knownSource=state.seq && state.age<2147483647;
   const char *heading=page==0?"ORCA / PEBBLE":page==1?"ATTENTION":"SESSIONS";
   text(g,heading,37,2,MUTED);
   if(now<cueUntil)g->fillCircle(233,61,3,AMBER);
   SessionState pose=c?c->state:SessionState::Unknown;
   char line[64];
-  if(!connected){text(g,state.seq?"Connection lost":"Status unknown",72,2,AMBER);pose=SessionState::Unknown;}
+  if(!connected){text(g,knownSource?"Connection lost":"Status unknown",72,2,AMBER);pose=SessionState::Unknown;}
   else if(page==0){
     if(state.attention)snprintf(line,sizeof(line),"%d need attention",state.attention);else strcpy(line,"All clear");
     text(g,line,72,3,state.attention?AMBER:WHITE);
@@ -140,8 +142,8 @@ void CompanionUI::draw(Arduino_GFX *g,uint32_t now)const{
     g->drawLine(401,214,411,226,WHITE);g->drawLine(411,226,401,238,WHITE);
   }
   if(!connected){
-    if(state.seq)snprintf(line,sizeof(line),"Last update %lus ago",(unsigned long)((uint64_t(age)+now-lastUpdate)/1000));
-    else strcpy(line,"No status received yet");
+    if(knownSource)snprintf(line,sizeof(line),"Last update %lus ago",(unsigned long)((uint64_t(age)+now-lastUpdate)/1000));
+    else strcpy(line,"No source status yet");
     text(g,line,300,2,MUTED);text(g,"Reconnect Orca to open",330,2,MUTED);
   }else if(unavailable()){text(g,"Session unavailable",302,2,WHITE);text(g,"Swipe to choose another",330,2,MUTED);}
   else if(c){

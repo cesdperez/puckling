@@ -4,7 +4,10 @@ import { dirname, join, resolve } from "node:path";
 
 export async function activateApp(app: string) {
   const child = Bun.spawn(["open", "-a", app], { stdout: "ignore", stderr: "ignore" });
-  if (await child.exited !== 0) throw new Error("Unable to bring Orca to the front");
+  const timeout = setTimeout(() => child.kill("SIGKILL"), 5000);
+  try {
+    if (await child.exited !== 0) throw new Error("Unable to bring Orca to the front");
+  } finally { clearTimeout(timeout); }
 }
 
 export async function revealChat(sessionId: string, executable = process.env.ORCA_CLI_COMMAND ?? "orca", activate = activateApp) {

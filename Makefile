@@ -1,6 +1,6 @@
 PIO ?= $(shell command -v pio 2>/dev/null || echo $(HOME)/.platformio/penv/bin/pio)
 
-.PHONY: setup sim sim-live puck-live test validate-sim flash monitor
+.PHONY: setup sim sim-live puck-live test validate-sim firmware flash monitor
 
 setup:
 	@command -v brew >/dev/null || { echo "Install Homebrew first: https://brew.sh"; exit 1; }
@@ -28,6 +28,9 @@ test:
 validate-sim:
 	$(MAKE) -C sim build/puckling-sim
 	python3 sim/validate.py
+
+firmware:
+	$(PIO) run -d firmware
 
 flash:
 	$(PIO) run -d firmware -t upload $(if $(PORT),--upload-port $(PORT))

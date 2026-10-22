@@ -16,7 +16,7 @@ export class FocusController {
   private lastRequest = 0;
   private offers = new Map<number, { at: number; ids: Map<string, string | undefined> }>();
   constructor(private model: SessionModel, private query: () => Promise<Agent[]>,
-    private focus: (agent: Agent) => Promise<void>, private publish: () => Promise<void>, private clock = Date.now) {}
+    private focus: (agent: Agent, fresh: () => boolean) => Promise<void>, private publish: () => Promise<void>, private clock = Date.now) {}
   offered(snapshot: Snapshot) {
     const now = this.clock();
     this.offers.set(snapshot.seq, { at: now, ids: new Map(snapshot.sessions.map(c => [c[0], this.model.revision(c[0])])) });
@@ -47,7 +47,7 @@ export class FocusController {
       if (target.paneKey?.startsWith("structured-agent-session-") && target.hostId !== "local") {
         await report("unsupported"); return false;
       }
-      await this.focus(target);
+      await this.focus(target, () => this.model.fresh(this.clock()));
       if (eventKey(target) === offer.ids.get(input.id)) this.model.acknowledge(input.id, offer.ids.get(input.id));
       await report("opened"); return true;
     } catch (error) {

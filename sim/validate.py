@@ -114,7 +114,7 @@ def main():
     master,slave=pty.openpty()
     try:
         tty.setraw(slave)
-        snapshot={'version':2,'type':'state','seq':1,'connected':True,'age':0,'total':1,'attention':1,'working':0,'monitoring':0,'cue':1,'request':0,'target':'','feedback':'none',
+        snapshot={'version':2,'type':'state','seq':1,'connected':True,'age':0,'total':1,'attention':1,'working':0,'monitoring':0,'cue':1,'request':0,'target':'','feedback':'none','selection':['1111111111111111']*3,
           'sessions':[['1111111111111111','goodhabitz','Session stale','claude',0,True,False,True,'Waiting for your input',1]]}
         os.write(master,(json.dumps(snapshot)+'\n').encode())
         process=subprocess.run([str(root/'sim/build/puckling-sim'),'--link',os.ttyname(slave),'--screenshot',str(output/'stale.png'),'--capture-after','9.5','--tap-after','9.1'],cwd=root,capture_output=True,text=True,timeout=20)

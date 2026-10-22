@@ -17,6 +17,7 @@ struct SessionSnapshot {
   int total = 0, attention = 0, working = 0, monitoring = 0, count = 0;
   bool connected = false;
   char target[17] = "";
+  char selection[3][17] = {};
   Feedback feedback = Feedback::None;
   SessionCard sessions[MAX_SESSIONS];
 };

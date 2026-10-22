@@ -16,7 +16,7 @@ async function publish() {
   writes = writes.then(async () => { await Bun.write(Bun.stdout, line); });
   await writes;
 }
-const focus = new FocusController(model, readOrca, openSession, publish);
+const focus = new FocusController(model, readOrca, (agent, fresh) => openSession(agent, undefined, undefined, fresh), publish);
 if (!args.includes("--once")) void readInputs(input => focus.open(input)).catch(() => console.error("Input link failed"));
 do {
   const started = Date.now();

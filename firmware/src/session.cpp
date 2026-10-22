@@ -68,6 +68,13 @@ bool parse(std::string_view line, SessionSnapshot &next) {
       const char *names[]={"none","opening","opened","retry","unavailable","unsupported","selected"};int i=0;
       for(;i<7;i++)if(!strcmp(value,names[i]))break;
       if(i==7)return false;next.feedback=Feedback(i);
+    } else if(!strcmp(key,"selection")){
+      bit=16384;if(!f.take('['))return false;
+      for(int i=0;i<3;i++){
+        if(i&&!f.take(','))return false;
+        if(!f.string(next.selection[i],sizeof(next.selection[i])) || (next.selection[i][0]&&!token(next.selection[i])))return false;
+      }
+      if(!f.take(']'))return false;
     } else if(!strcmp(key,"sessions")){
       bit=8192;if(!f.take('['))return false;
       if(!f.take(']')) {
@@ -80,7 +87,7 @@ bool parse(std::string_view line, SessionSnapshot &next) {
     } else return false;
     if(seen&bit)return false;seen|=bit;
   }while(f.take(','));
-  return seen==16383 && f.take('}') && f.ended() && next.total>=next.count && next.attention<=next.total;
+  return seen==32767 && f.take('}') && f.ended() && next.total>=next.count && next.attention<=next.total;
 }
 }
 bool StateStream::feed(char byte,SessionSnapshot &snapshot) {

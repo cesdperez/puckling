@@ -15,7 +15,7 @@ export type Feedback = "none" | "opening" | "opened" | "retry" | "unavailable" |
 export type Snapshot = {
   version: 2; type: "state"; seq: number; connected: boolean; age: number;
   total: number; attention: number; working: number; monitoring: number; cue: number;
-  request: number; target: string; feedback: Feedback; sessions: Card[];
+  request: number; target: string; feedback: Feedback; selection: string[]; sessions: Card[];
 };
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid Orca response");
@@ -160,6 +160,6 @@ export class SessionModel {
       age: Number.isFinite(this.queriedAt) ? Math.min(2147483647, Math.max(0, now - this.queriedAt)) : 2147483647,
       total: recent.length, attention: recent.filter(a => alert(a)).length,
       working: all.filter(a => cardState(a) === 4).length, monitoring: all.filter(a => cardState(a) === 5).length,
-      cue: this.cue, ...this.receipt, sessions };
+      cue: this.cue, ...this.receipt, selection: [...this.pins], sessions };
   }
 }
