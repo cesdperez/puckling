@@ -14,6 +14,9 @@ import json, os, pathlib, sys
 args=sys.argv[1:];mode=os.environ["PEBBLE_SCENARIO"]
 log=pathlib.Path(os.environ["PEBBLE_FOCUS_LOG"])
 if args==["terminal","list","--limit","10000","--json"]:
+    if mode=="slow-focus":
+        import time
+        time.sleep(0.8)
     terminals=[{"handle":"term_"+str(i),"executionHostId":"local","worktreeId":"tree" if i<3 else "other",
       "tabId":"tab"+str(i),"leafId":"leaf","connected":True,"orphaned":False} for i in range(5)]
     if mode=="unavailable-target":terminals=[]
@@ -78,6 +81,13 @@ def main():
         at=1.2+i*0.22
         many+=f'{at:.3f} 1 233 300\n{at+0.035:.3f} 1 233 230\n{at+0.07:.3f} 0 233 230\n'
     scenarios.append(('bounded-window','many',many,9.5,None))
+    across=horizontal+horizontal.replace('0.7','1.1').replace('0.8','1.2').replace('0.9','1.3')
+    across+='1.5 1 233 300\n1.55 1 233 230\n1.6 0 233 230\n1.8 1 233 300\n1.85 1 233 230\n1.9 0 233 230\n'
+    across+='2.1 1 330 280\n2.15 1 130 280\n2.2 0 130 280\n2.3 1 233 390\n2.35 0 233 390\n'
+    across+='2.45 1 330 280\n2.5 1 130 280\n2.55 0 130 280\n2.6 1 330 280\n2.65 1 130 280\n2.7 0 130 280\n'
+    across+='2.8 1 233 390\n2.85 0 233 390\n3.6 1 233 390\n3.65 0 233 390\n'
+    scenarios.append(('cross-page-focus','slow-focus',across,5.0,'term_0\nterm_3'))
+
     with tempfile.TemporaryDirectory(prefix='pebble-validation-') as tmp:
         tmp=Path(tmp);cli=tmp/'orca-fixture';cli.write_text(f'#!{sys.executable}\n'+FIXTURE);cli.chmod(0o700)
         for name,mode,script,duration,expected in scenarios:
@@ -110,6 +120,9 @@ def main():
                 if name==scenario:assert f'state={state}' in logs,logs
             if name=='unsupported':assert 'feedback=5' in logs,logs
             if name=='seen-request':assert 'position=2' in logs,logs
+            if name=='cross-page-focus':
+                assert logs.count('input action=open')==2,logs
+                assert 'state=Monitoring position=3 feedback=2' in logs,logs
             print(f'PASS {name}: {shot.relative_to(root)}',flush=True)
     master,slave=pty.openpty()
     try:

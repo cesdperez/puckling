@@ -37,6 +37,24 @@ int main(){
   assert(!offline.touch({true,233,390},now,msg,sizeof(msg)));
   assert(!offline.touch({false,233,390},now+50,msg,sizeof(msg)));
   assert(offline.pageIndex()==0);
+  CompanionUI acrossPages;auto across=sampleSnapshot();strcpy(across.selection[2],across.sessions[1].id);
+  acrossPages.update(across,true,0,1000);
+  acrossPages.touch({true,233,390},1010,msg,sizeof(msg));
+  assert(acrossPages.touch({false,233,390},1060,msg,sizeof(msg)));
+  for(int n=0;n<2;n++){
+    acrossPages.touch({true,330,280},1100+n*100,msg,sizeof(msg));
+    acrossPages.touch({true,130,280},1130+n*100,msg,sizeof(msg));
+    assert(!acrossPages.touch({false,130,280},1160+n*100,msg,sizeof(msg)));
+  }
+  assert(acrossPages.pageIndex()==2);
+  acrossPages.touch({true,233,390},1300,msg,sizeof(msg));
+  assert(!acrossPages.touch({false,233,390},1350,msg,sizeof(msg)));
+  across.request=1;strcpy(across.target,across.sessions[0].id);across.feedback=Feedback::Opened;
+  acrossPages.update(across,true,0,1400);
+  assert(acrossPages.actionFeedback()==Feedback::None);
+  acrossPages.touch({true,233,390},1450,msg,sizeof(msg));
+  assert(acrossPages.touch({false,233,390},1500,msg,sizeof(msg)));
+  assert(std::string(msg).find(across.sessions[1].id)!=std::string::npos);
   // Exercise actual shared rendering, including every state and empty/offline frames.
   Arduino_GFX gfx(466,466);
   for(int state=0;state<8;state++){s=sampleSnapshot();s.sessions[0].state=SessionState(state);ui.update(s,true,0,now);ui.draw(&gfx,now);}

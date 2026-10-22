@@ -59,6 +59,14 @@ void pebble(Arduino_GFX *g,SessionState state,uint32_t now,bool calm){
   if(calm && state==SessionState::Finished && now%8000<1200) {g->fillRect(370,160,4,12,MINT);g->fillRect(366,164,12,4,MINT);}
 }
 }
+Feedback CompanionUI::actionFeedback()const {
+  if(focusBusy)return Feedback::Opening;
+  return strcmp(actionId,selected[page])?Feedback::None:feedback;
+}
+void CompanionUI::localFeedback(Feedback value){
+  strcpy(actionId,selected[page]);feedback=value;focusRequest=0;focusBusy=false;
+}
+void CompanionUI::transportFailed(){pendingView=-1;localFeedback(Feedback::Retry);}
 int CompanionUI::index()const {for(int i=0;i<state.count;i++)if(!strcmp(selected[page],state.sessions[i].id) && eligible(i))return i;return -1;}
 bool CompanionUI::eligible(int i)const{return page==2 || state.sessions[i].attention;}
 bool CompanionUI::unavailable()const{return selected[page][0]&&index()<0 && !(page==0&&state.attention==0);}
@@ -70,8 +78,10 @@ void CompanionUI::update(const SessionSnapshot &snapshot,bool fresh,uint32_t sou
   if(!down && pendingView>=0 && state.request==request && state.feedback==Feedback::Selected){
     strcpy(selected[pendingView],state.target);pendingView=-1;feedback=Feedback::None;
   }
-  if(request && state.request==request && !strcmp(state.target,pressedId) && state.feedback!=Feedback::None && state.feedback!=Feedback::Selected)feedback=state.feedback;
-  if(feedback==Feedback::Opening && now-pendingSince>20000)feedback=Feedback::Retry;
+  if(focusRequest && state.request==focusRequest && !strcmp(state.target,actionId) && state.feedback!=Feedback::None && state.feedback!=Feedback::Selected){
+    feedback=state.feedback;focusBusy=feedback==Feedback::Opening;
+  }
+  if(focusBusy && now-pendingSince>20000){feedback=Feedback::Retry;focusBusy=false;}
   if(pendingView>=0 && now-pendingSince>8000)pendingView=-1;
   int i=index();
   if(i>=0 && (strcmp(expressionId,state.sessions[i].id) || expressionState!=state.sessions[i].state)){
@@ -79,7 +89,7 @@ void CompanionUI::update(const SessionSnapshot &snapshot,bool fresh,uint32_t sou
   }
 }
 bool CompanionUI::step(int direction,char *message,size_t size){
-  if(!live || pendingView>=0 || feedback==Feedback::Opening)return false;
+  if(!live || pendingView>=0 || focusBusy)return false;
   request=request==2147483647?1:request+1;pendingView=page;pendingSince=lastInteraction;
   return stepMessage(message,size,selected[page],state.seq,request,page,direction)>0;
 }
@@ -97,7 +107,7 @@ bool CompanionUI::touch(TouchSample sample,uint32_t now,char *message,size_t siz
   int dx=sample.x-startX,dy=sample.y-startY;
   if(abs(dx)>16||abs(dy)>16)dragged=true;
   if(dragged){
-    if(abs(dx)>=48 && abs(dx)>abs(dy)*1.25f){page=(page+(dx<0?1:2))%3;feedback=Feedback::None;selectInitial();}
+    if(abs(dx)>=48 && abs(dx)>abs(dy)*1.25f){page=(page+(dx<0?1:2))%3;selectInitial();}
     else if(abs(dy)>=40 && abs(dy)>abs(dx)*1.25f)return step(dy<0?1:-1,message,size);
     return false;
   }
@@ -106,11 +116,11 @@ bool CompanionUI::touch(TouchSample sample,uint32_t now,char *message,size_t siz
   if(startY<366||startY>418||startX<104||startX>362)return false;
   if(!live || now-lastUpdate+age>8000)return false;
   if(page==0&&(!state.attention||!selected[page][0])){page=2;selectInitial();return false;}
-  if(!live || pendingView>=0 || now-lastUpdate+age>8000 || feedback==Feedback::Opening || strcmp(pressedId,selected[page]))return false;
-  if(page==0 && feedback==Feedback::Opened && state.attention>1)return step(1,message,size);
-  int i=index();if(i<0){feedback=Feedback::Unavailable;return false;}
-  if(!state.sessions[i].supported){feedback=Feedback::Unsupported;return false;}
-  pendingView=-1;request=request==2147483647?1:request+1;feedback=Feedback::Opening;pendingSince=now;
+  if(!live || pendingView>=0 || now-lastUpdate+age>8000 || focusBusy || strcmp(pressedId,selected[page]))return false;
+  if(page==0 && actionFeedback()==Feedback::Opened && state.attention>1)return step(1,message,size);
+  int i=index();if(i<0){localFeedback(Feedback::Unavailable);return false;}
+  if(!state.sessions[i].supported){localFeedback(Feedback::Unsupported);return false;}
+  pendingView=-1;request=request==2147483647?1:request+1;focusRequest=request;strcpy(actionId,pressedId);focusBusy=true;feedback=Feedback::Opening;pendingSince=now;
   return openMessage(message,size,pressedId,pressedSeq,request)>0;
 }
 void CompanionUI::draw(Arduino_GFX *g,uint32_t now)const{
@@ -155,19 +165,20 @@ void CompanionUI::draw(Arduino_GFX *g,uint32_t now)const{
     if(page==0){snprintf(line,sizeof(line),"%d working / %d monitoring",state.working,state.monitoring);text(g,line,287,2,MUTED);}
     text(g,state.total?"Browse active and recent":"No active or recent sessions",314,2,MUTED);text(g,"Swipe left to explore",340,2,MUTED);
   }
+  Feedback shown=actionFeedback();
   const char *action="Open in Orca";
-  if(feedback==Feedback::Opening)action="Opening...";
-  else if(feedback==Feedback::Opened){
+  if(shown==Feedback::Opening)action="Opening...";
+  else if(shown==Feedback::Opened){
     action="Opened";
     if(page==0&&now-pendingSince>1500&&state.attention>1)action="Next request";
   }
-  else if(feedback==Feedback::Retry)action="Retry open";
-  else if(feedback==Feedback::Unavailable)action="Target unavailable";
-  else if(feedback==Feedback::Unsupported || (c&&!c->supported))action="Unsupported target";
+  else if(shown==Feedback::Retry)action="Retry open";
+  else if(shown==Feedback::Unavailable)action="Target unavailable";
+  else if(shown==Feedback::Unsupported || (c&&!c->supported))action="Unsupported target";
   else if(!connected)action="Offline";
   else if(unavailable())action="Choose another";
   else if(!c)action=page==0?"Browse sessions":page==1?"No requests":"No sessions";
-  if(page==0&&!state.attention&&feedback!=Feedback::Opening&&now-pendingSince>1500)action="Browse sessions";
+  if(page==0&&!state.attention&&shown!=Feedback::Opening&&now-pendingSince>1500)action="Browse sessions";
   if(!connected)action="Offline";
   bool enabled=connected&&!unavailable()&&(c?c->supported:page==0);
   g->fillRoundRect(104,366,258,52,26,enabled?WHITE:GRAPHITE);text(g,action,385,2,enabled?0:MUTED);
