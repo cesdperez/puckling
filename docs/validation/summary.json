@@ -1,16 +1,16 @@
 {
-  "implementationCommit": "3b9d05d6fdff9af07f4c95c5ae5c5c106eda7af3",
+  "implementationCommit": "8f5ff3c2f6b047f797d66c5a4afc11a75480a1bc",
   "branch": "cesdperez/pebble-session-companion",
   "results": {
     "bunTests": 28,
     "nativeTestExecutables": 3,
     "pythonTests": 2,
-    "simulatorScenarios": 23,
+    "simulatorScenarios": 24,
     "firmwareCompile": "PASS, no upload"
   },
   "firmwareMemory": [
-    "RAM:   [=         ]  14.1% (used 46312 bytes from 327680 bytes)",
-    "Flash: [=         ]  13.1% (used 437276 bytes from 3342336 bytes)"
+    "RAM:   [=         ]  14.1% (used 46328 bytes from 327680 bytes)",
+    "Flash: [=         ]  13.1% (used 437444 bytes from 3342336 bytes)"
   ],
   "liveSmoke": {
     "orcaVersion": "1.4.232",
@@ -155,6 +155,12 @@
       "capture": "capture page=1 state=Needs input position=36 feedback=0 source=Orca connected",
       "screenshot": "docs/validation/bounded-window.png",
       "sha256": "c19c38eff8325117cae2ab57cb82fe5e5759255a6040e0aef253ef5933f490af"
+    },
+    {
+      "scenario": "cross-page-focus",
+      "capture": "capture page=2 state=Monitoring position=3 feedback=2 source=Orca connected",
+      "screenshot": "docs/validation/cross-page-focus.png",
+      "sha256": "04bb66406ca99b21fbacbb51507141fea14823175ed27c9b8405fe335a521f5d"
     },
     {
       "scenario": "stale",
