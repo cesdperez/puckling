@@ -1,0 +1,166 @@
+{
+  "implementationCommit": "3b9d05d6fdff9af07f4c95c5ae5c5c106eda7af3",
+  "branch": "cesdperez/pebble-session-companion",
+  "results": {
+    "bunTests": 28,
+    "nativeTestExecutables": 3,
+    "pythonTests": 2,
+    "simulatorScenarios": 23,
+    "firmwareCompile": "PASS, no upload"
+  },
+  "firmwareMemory": [
+    "RAM:   [=         ]  14.1% (used 46312 bytes from 327680 bytes)",
+    "Flash: [=         ]  13.1% (used 437276 bytes from 3342336 bytes)"
+  ],
+  "liveSmoke": {
+    "orcaVersion": "1.4.232",
+    "protocol": 2,
+    "connected": true,
+    "recentSessions": 12,
+    "windowCards": 12,
+    "working": 3,
+    "monitoring": 1,
+    "liveTerminals": 7,
+    "navigationExercised": false
+  },
+  "captures": [
+    {
+      "scenario": "home",
+      "capture": "capture page=0 state=Needs input position=1 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/home.png",
+      "sha256": "105b95a8bcad18138571cbe28364adcf9dce6528e3835606a8d9745701c6d7d3"
+    },
+    {
+      "scenario": "unsupported",
+      "capture": "capture page=1 state=Needs input position=1 feedback=5 source=Orca connected",
+      "screenshot": "sim/build/validation/unsupported.png",
+      "sha256": "e06bb3aef1bc276acfa30d7d071ed183045f11ef24a9d64c5cb878e0a9ca3bc8"
+    },
+    {
+      "scenario": "all-clear",
+      "capture": "capture page=0 state=none position=0 feedback=0 source=Orca connected",
+      "screenshot": "sim/build/validation/all-clear.png",
+      "sha256": "b2a494ac291f27459ccd1531d44c779da7e17385a2ea0e004d7c4e286c3c04a3"
+    },
+    {
+      "scenario": "retry-opened",
+      "capture": "capture page=0 state=Needs input position=1 feedback=3 source=Orca connected",
+      "screenshot": "sim/build/validation/retry-opened.png",
+      "sha256": "36312278ff124144fc85b23bf94f222e4dae39f652286ccf7de33c6b69afb780"
+    },
+    {
+      "scenario": "seen-request",
+      "capture": "capture page=1 state=Needs input position=2 feedback=2 source=Orca connected",
+      "screenshot": "sim/build/validation/seen-request.png",
+      "sha256": "9787afde00972113d6779b306e353bab02fce7a71564eb38fa4791667b8ea27a"
+    },
+    {
+      "scenario": "next-request",
+      "capture": "capture page=0 state=Failed position=1 feedback=0 source=Orca connected",
+      "screenshot": "sim/build/validation/next-request.png",
+      "sha256": "52a6065852ad343e9622e36964202046e63ff05301e93e81e53d090ad1a3fdaa"
+    },
+    {
+      "scenario": "attention",
+      "capture": "capture page=1 state=Needs input position=1 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/attention.png",
+      "sha256": "14460f5d161f61574a3d09baae4f989e1850968c2be6e548a6a6d538b6971402"
+    },
+    {
+      "scenario": "sessions",
+      "capture": "capture page=2 state=Needs input position=1 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/sessions.png",
+      "sha256": "fe5299abe2a8dd925669518d18032fc511a101d14c7746b01c73695183de0ccf"
+    },
+    {
+      "scenario": "failed",
+      "capture": "capture page=1 state=Failed position=2 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/failed.png",
+      "sha256": "5d73e46f2a001952cd76325198c8e88354bb27b6209af7c8399835ba2d3c4ebd"
+    },
+    {
+      "scenario": "working",
+      "capture": "capture page=2 state=Working position=1 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/working.png",
+      "sha256": "edf72df546d870ab7d3e1e53e720192494b3e601967ad1ece473ab603e9d9ef3"
+    },
+    {
+      "scenario": "monitoring",
+      "capture": "capture page=2 state=Monitoring position=1 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/monitoring.png",
+      "sha256": "c001b335bddd6432766faedbf0858f4cbe52fe62c5774eb42253b633e6c20d40"
+    },
+    {
+      "scenario": "finished",
+      "capture": "capture page=1 state=Finished position=1 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/finished.png",
+      "sha256": "ca05c8f628cba68dadd3c3e531f9e3a4258307166095cc88e004193a65950d57"
+    },
+    {
+      "scenario": "empty",
+      "capture": "capture page=0 state=none position=0 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/empty.png",
+      "sha256": "378ac931a3c4a6791c03dfaa48545f266ad1dcef26755e3f3197353429b724a8"
+    },
+    {
+      "scenario": "disconnected",
+      "capture": "capture page=0 state=none position=0 feedback=0 source=link stale",
+      "screenshot": "docs/validation/disconnected.png",
+      "sha256": "fa04f746f03511db1ae5d87c1f992d858fe71f79fd38c6ac4d152d425c203dcf"
+    },
+    {
+      "scenario": "opened",
+      "capture": "capture page=0 state=Needs input position=2 feedback=2 source=Orca connected",
+      "screenshot": "sim/build/validation/opened.png",
+      "sha256": "8e78925de3cc1637791b3e8972c148368c55a98ab86b8f1950c0cd23e999fe51"
+    },
+    {
+      "scenario": "failed-focus",
+      "capture": "capture page=0 state=Needs input position=1 feedback=3 source=Orca connected",
+      "screenshot": "docs/validation/failed-focus.png",
+      "sha256": "db12bb0bc4bcde281ad53d7a787c7b2bc7db3f5c8ec9d74b67b7fdab062cf487"
+    },
+    {
+      "scenario": "unavailable-target",
+      "capture": "capture page=0 state=Needs input position=1 feedback=4 source=Orca connected",
+      "screenshot": "sim/build/validation/unavailable-target.png",
+      "sha256": "5e4115f2c9d271ef2633f545f059714103100473f95256765f0dd192c513b894"
+    },
+    {
+      "scenario": "stable-selection",
+      "capture": "capture page=0 state=Needs input position=3 feedback=2 source=Orca connected",
+      "screenshot": "sim/build/validation/stable-selection.png",
+      "sha256": "be3410698d47582bd9b540ff079040ead3af1a739ad133de375e1e57c5d7d09c"
+    },
+    {
+      "scenario": "removed",
+      "capture": "capture page=0 state=none position=0 feedback=4 source=Orca connected",
+      "screenshot": "sim/build/validation/removed.png",
+      "sha256": "87c574e1d866dcbd1ec3553cd33dc14a8e6ca0d5a59e1cd53d8031a0aa6b353d"
+    },
+    {
+      "scenario": "long-labels",
+      "capture": "capture page=1 state=Needs attention position=1 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/long-labels.png",
+      "sha256": "7896826d8d4798aa1d0816cecec64735a6f27e0066299f4beda5f6c99c29893e"
+    },
+    {
+      "scenario": "drag-cancels-tap",
+      "capture": "capture page=0 state=Needs input position=1 feedback=0 source=Orca connected",
+      "screenshot": "sim/build/validation/drag-cancels-tap.png",
+      "sha256": "105b95a8bcad18138571cbe28364adcf9dce6528e3835606a8d9745701c6d7d3"
+    },
+    {
+      "scenario": "bounded-window",
+      "capture": "capture page=1 state=Needs input position=36 feedback=0 source=Orca connected",
+      "screenshot": "docs/validation/bounded-window.png",
+      "sha256": "c19c38eff8325117cae2ab57cb82fe5e5759255a6040e0aef253ef5933f490af"
+    },
+    {
+      "scenario": "stale",
+      "capture": "capture page=0 state=Needs input position=1 feedback=0 source=link stale",
+      "screenshot": "docs/validation/stale.png",
+      "sha256": "976b2f0de069a61c8d3908125590b9b2616449dce6072db76458761cf2b367fa"
+    }
+  ]
+}

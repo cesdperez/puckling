@@ -1,32 +1,34 @@
 # Architecture
 
+Pebble is an Orca session companion. The [approved three-screen design](pebble-design.md) governs the product. The generated concept images remain references; production artwork is separate indexed pixel data.
+
+```text
+Orca worktree ps -> Bun daemon -> bounded JSON lines -> USB or raw PTY
+                         ^                               |
+                         | exact identity + request      v
+                  focus receipt <- existing tab/pane <- shared firmware UI
 ```
- Claude Code transcripts ─┐
- Codex sessions ──────────┤                         ┌──────────────┐
- orca worktree ps --json ─┼──> daemon (Mac) <──────>│ puck firmware │
- orca terminal ... ───────┘    owns all state  link └──────────────┘
-                                                    renders, sends input
-```
 
-## Rules
+## Ownership
 
-- **The daemon owns state.** The creature, agent list and everything else live on the Mac. The puck renders what it receives and reports input events. This keeps firmware small and lets most changes ship without a reflash.
-- **The creature can be rebuilt from history.** Its state derives from the token log plus a few stored choices (name, seed). If the state file is lost, replay the transcripts.
-- **The protocol is small JSON messages.** Daemon to puck: `state` snapshots. Puck to daemon: `input` events (`tap`, `long_press`, `turn` with degrees, `swipe`, `shake`). Version every message.
+The daemon owns session identities, metadata filtering, active/recent inclusion, ordering, attention events, acknowledgement, browsing windows, and focus revalidation. Firmware renders snapshots and owns responsive page, selection, gesture, animation, and pending-action state. No transcript or prompt is sent to the device.
 
-## Decisions
+The daemon retains all sessions from a complete cross-host query of unarchived workspaces. Every snapshot transports at most 32 cards. Server-side stepping traverses the entire ordered list. The three selected identities are pinned into subsequent windows, so changing priorities or moving far through a long list cannot evict another page's selected card. Missing identities remain unavailable until deliberate navigation.
 
-- **UI is reviewed on the Mac before it is flashed.** Three stages:
-  1. Clickable HTML mockups on a 466x466 round canvas to pick a direction. Throwaway code, limited to what LVGL can draw on this chip (flat shapes, arcs, sprites, simple tweens).
-  2. The simulator in `sim/`: the firmware's drawing and world code compiled for macOS against a small Arduino and Arduino_GFX shim, shown with raylib. Mouse and keys stand in for touch and the IMU. The real daemon drives it over a raw pseudo-terminal created by `sim/live.py`, using Python's standard library. Approval happens here.
-  3. Flash approved builds only. Check on the device what the simulator cannot show: AMOLED color, touch and IMU feel, frame rate.
+A complete snapshot arrives every two seconds and after input receipts. The source age is separate from transport arrival time. An action receipt cannot make old Orca data fresh. Incomplete host coverage is an outage, never an empty list. See [protocol](protocol.md).
 
-  Reason: design iteration is minutes in a browser and slow on hardware. The simulator runs the same C code as the puck, so what gets approved is what gets flashed. Only hardware access (`display.cpp`, `sensors.cpp`) stays out of the simulator, so keep drawing and behaviour out of those files. Full ESP32-S3 emulators (Wokwi, Espressif QEMU) were rejected because neither emulates the CO5300 display or CST9217 touch.
+## Implementation choices
 
-- **The first link is USB serial.** The puck sits on the desk plugged in, so no pairing or credentials are needed. The simulator validates the state protocol over a pseudo-terminal. The physical puck uses the same protocol over USB Serial/JTAG, with a Python standard-library bridge to the daemon. Firmware reads snapshots, applies the shared expressions, and reports touch events. Wi-Fi remains a later option for battery use.
+- **Bun/TypeScript daemon:** subprocess calls, metadata reduction and tests without package dependencies. Acknowledgements are in memory. Restart/reconnect baselines old completions; requests remain actionable.
+- **USB serial:** the existing standard-library Python bridge stays in place, with partial writes and bounded queues. The simulator's raw PTY carries the same duplex protocol.
+- **Arduino_GFX renderer:** the lightweight renderer draws text, flat surfaces, icons and integer-scaled indexed sprites. No UI framework dependency was needed. Hardware draws at up to 15 frames per second. The desktop shim implements the same primitives against an RGB565 framebuffer.
+- **Shared UI:** `firmware/src/ui.cpp` and `session.cpp` run unchanged in the native raylib simulator and ESP32 build. Sensor/display drivers stay outside the simulator.
+- **Original sprites:** `tools/build_sprites.py` encodes authored polygons on a 64 by 44 logical grid and emits PNG previews plus checked-in pixel rows. Runtime rendering reads those assets, not procedural shapes or the concept board. See [art provenance](creature.md).
+- **Exact focus adapters:** existing terminal-handle and local native-chat adapters are retained. The daemon refreshes discovery, checks the selected identity, and validates the receipt. It never creates a tab.
+- **Board support:** CO5300, CST9217 and QMI8658 configuration remains specific to the Waveshare 1.75C. Continuous touch reports feed the shared gesture recognizer. Quiet interrupt gaps synthesize release when the controller omits a release report.
 
-- **Firmware uses PlatformIO with Arduino-ESP32.** It matches the board examples and the working firmware. ESP-IDF is an option if the Arduino framework reaches a limit.
+## Validation boundary
 
-- **The MVP keeps raw Arduino_GFX.** The existing renderer supports the procedural pet and all four session expressions, and the simulator compiles it unchanged. LVGL can be reconsidered when widgets or navigation need it.
+`make test` checks business state, framing, freshness, exact navigation, gestures and the USB bridge. `make validate-sim` drives real shared rendering/input through a synthetic Orca daemon and PTY. `make firmware` compiles without uploading. Simulator success cannot establish sensor timing, audio, brightness, physical USB responsiveness or display frame rate. See [validation](validation.md).
 
-- **The daemon uses Bun/TypeScript.** JSON parsing, subprocess polling, and tests need no package dependencies. Swift can be reconsidered for a native Mac interface.
+Audio, lift-to-wake, face-down mute and twist control are pending. The UI remains fully usable silently. There is no pet-care or transcript ingestion subsystem.
