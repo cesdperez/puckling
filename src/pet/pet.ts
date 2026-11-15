@@ -36,6 +36,15 @@ export type PetPose = {
   facing: -1 | 1; eyeOpen: number; lookX: number; brightness: number;
 };
 
+export function poseBounds(p: PetPose): { x: number; y: number; width: number; height: number } {
+  const margin = 2;
+  const x = Math.max(0, Math.floor(Math.min(p.x - ARM_EXTENT * p.scaleX, p.x - SHADOW_HALF_WIDTH) - margin));
+  const y = Math.max(0, Math.floor(Math.min(p.y + BODY_RADIUS - (BODY_HEIGHT + LEG_LENGTH) * p.scaleY, p.groundY + SHADOW_OFFSET) - margin));
+  const right = Math.min(SIZE, Math.ceil(Math.max(p.x + ARM_EXTENT * p.scaleX, p.x + SHADOW_HALF_WIDTH) + margin));
+  const bottom = Math.min(SIZE, Math.ceil(Math.max(p.y + BODY_RADIUS, p.groundY + SHADOW_OFFSET + SHADOW_HEIGHT) + margin));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
 function random(state: PetState): number {
   state.seed = (Math.imul(state.seed, 1664525) + 1013904223) >>> 0;
   return state.seed / 4294967296;

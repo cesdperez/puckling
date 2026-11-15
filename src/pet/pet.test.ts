@@ -1,7 +1,40 @@
 import { describe, expect, test } from "bun:test";
-import { BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, step } from "./pet";
+import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, poseBounds, step } from "./pet";
 
 describe("pet", () => {
+  test("pose bounds contain every painted rectangle", () => {
+    let state = createPet(7);
+    const modes = new Set<string>();
+    for (let i = 0; i < 6000; i++) {
+      const tap = i % 300 === 0 ? { x: state.x, y: state.y } :
+        i % 300 === 150 ? { x: (i * 17) % SIZE, y: (i * 31) % SIZE } : undefined;
+      state = step(state, { tap }, 1 / 30);
+      modes.add(state.mode);
+      const p = pose(state), bounds = poseBounds(p);
+      const sx = p.scaleX, sy = p.scaleY, left = p.x - ARM_EXTENT * sx;
+      const top = p.y + BODY_RADIUS - (BODY_HEIGHT + LEG_LENGTH) * sy;
+      const lift = p.groundY - p.y, eyeHeight = Math.max(3, 26 * p.eyeOpen) * sy;
+      const eyeShift = p.lookX + p.facing * 2, eyeTop = top + 38 * sy - eyeHeight / 2;
+      const rects = [
+        [p.x - SHADOW_HALF_WIDTH + lift / 2, p.groundY + SHADOW_OFFSET, 2 * SHADOW_HALF_WIDTH - lift, SHADOW_HEIGHT],
+        [p.x - BODY_HALF_WIDTH * sx, top, 2 * BODY_HALF_WIDTH * sx, BODY_HEIGHT * sy],
+        [left, top + ARM_TOP * sy, (ARM_EXTENT - BODY_HALF_WIDTH + 1) * sx, ARM_HEIGHT * sy],
+        [p.x + (BODY_HALF_WIDTH - 1) * sx, top + ARM_TOP * sy, (ARM_EXTENT - BODY_HALF_WIDTH + 1) * sx, ARM_HEIGHT * sy],
+        ...[24, 40, 80, 96].map(x => [left + x * sx, top + BODY_HEIGHT * sy, 8 * sx, LEG_LENGTH * sy]),
+        ...[32, 88].map(x => [left + (x + eyeShift) * sx, eyeTop, 8 * sx, eyeHeight]),
+      ];
+      for (const [x, y, width, height] of rects) {
+        expect(x).toBeGreaterThanOrEqual(bounds.x);
+        expect(y).toBeGreaterThanOrEqual(bounds.y);
+        expect(x + width).toBeLessThanOrEqual(bounds.x + bounds.width);
+        expect(y + height).toBeLessThanOrEqual(bounds.y + bounds.height);
+      }
+      expect(bounds.width * bounds.height).toBeLessThan(SIZE * SIZE / 4);
+    }
+    expect(modes.has("flinch")).toBe(true);
+    expect(modes.has("hop")).toBe(true);
+  });
+
   test("is deterministic and does not mutate its input", () => {
     let a = createPet(123), b = createPet(123);
     for (let i = 0; i < 1000; i++) {

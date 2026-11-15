@@ -1,10 +1,12 @@
 import type { GeaCanvasElement } from '@geastack/core'
-import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, type PetPose } from './pet/pet'
+import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, poseBounds, type PetPose } from './pet/pet'
 
 type Context2D = ReturnType<GeaCanvasElement['getContext']>
 
 const BACKGROUND = '#000000'
 const EYES = '#000000'
+let previousBounds: ReturnType<typeof poseBounds> | undefined
+let previousBrightness: number | undefined
 
 function colour(r: number, g: number, b: number, brightness: number): string {
   const hex = '0123456789abcdef'
@@ -20,7 +22,18 @@ export function drawFrame(ctx: Context2D, p: PetPose): void {
   const top = p.y + BODY_RADIUS - (BODY_HEIGHT + LEG_LENGTH) * sy
 
   ctx.fillStyle = BACKGROUND
-  ctx.fillRect(0, 0, SIZE, SIZE)
+  const bounds = poseBounds(p)
+  if (!previousBounds || previousBrightness !== p.brightness) {
+    ctx.fillRect(0, 0, SIZE, SIZE)
+  } else {
+    const x = Math.min(previousBounds.x, bounds.x)
+    const y = Math.min(previousBounds.y, bounds.y)
+    const right = Math.max(previousBounds.x + previousBounds.width, bounds.x + bounds.width)
+    const bottom = Math.max(previousBounds.y + previousBounds.height, bounds.y + bounds.height)
+    ctx.fillRect(x, y, right - x, bottom - y)
+  }
+  previousBounds = bounds
+  previousBrightness = p.brightness
 
   ctx.fillStyle = colour(40, 32, 29, p.brightness)
   ctx.fillRect(p.x - SHADOW_HALF_WIDTH + lift / 2, p.groundY + SHADOW_OFFSET, 2 * SHADOW_HALF_WIDTH - lift, SHADOW_HEIGHT)
