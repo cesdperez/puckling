@@ -25,6 +25,7 @@ export type State = {
   models: Record<string, string>;
   hasRecords: Record<string, boolean>;
   watermark: number;
+  since: number;
   seen: Record<string, number>;
   counters: Record<"total" | Tool | "night" | "parallel", number>;
   recent: {
@@ -45,6 +46,7 @@ export function emptyState(): State {
     models: {},
     hasRecords: {},
     watermark: 0,
+    since: 0,
     seen: {},
     counters: {
       total: 0,
@@ -63,6 +65,7 @@ export function loadState(path = statePath()) {
   state.tokens ??= {};
   state.days ??= {};
   state.generation ??= Math.floor(Date.now() / 1000);
+  state.since ??= 0;
   return state;
 }
 export function saveState(state: State, path = statePath()) {

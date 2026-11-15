@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { mkdtempSync, writeFileSync, appendFileSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, appendFileSync, existsSync, readFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
@@ -177,6 +177,39 @@ test("backfill counts only meals in its window", async () => {
   );
   expect(result.exitCode).toBe(0);
   expect(JSON.parse(await Bun.file(statePath).text()).counters.total).toBe(1);
+});
+
+test("backfill floor persists across polls", async () => {
+  const d = dir(), now = Date.now(), old = join(d, "old.jsonl");
+  const line = (id: string, time: number) => JSON.stringify({
+    type: "assistant", timestamp: new Date(time).toISOString(), sessionId: "s",
+    message: { id, model: "opus", usage: { input_tokens: 1000 } },
+  }) + "\n";
+  writeFileSync(old, line("old", now - 5 * 86400000));
+  utimesSync(old, new Date(now - 5 * 86400000), new Date(now - 5 * 86400000));
+  writeFileSync(join(d, "recent.jsonl"), line("recent", now - 3600000));
+  const keys = ["PUCKLING_FEEDER_STATE", "PUCKLING_CLAUDE_DIR", "PUCKLING_CODEX_DIR", "PUCKLING_OPENCODE_DB"] as const;
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  Object.assign(process.env, {
+    PUCKLING_FEEDER_STATE: join(d, "state.json"), PUCKLING_CLAUDE_DIR: d,
+    PUCKLING_CODEX_DIR: join(d, "none"), PUCKLING_OPENCODE_DB: join(d, "none.db"),
+  });
+  try {
+    const first = await runOnce(["--backfill", "2", "--dry-run"], "2");
+    const second = await runOnce(["--backfill", "2", "--dry-run"], "2");
+    expect(second.counters).toEqual(first.counters);
+    expect(second.counters.total).toBe(1);
+    expect(second.tokens).toEqual({ opus: { input: 1000, output: 0, cacheRead: 0, cacheWrite: 0 } });
+    utimesSync(old, new Date(), new Date());
+    const third = await runOnce(["--backfill", "2", "--dry-run"], "2");
+    expect(third.counters.total).toBe(1);
+    expect(third.offsets[old]).toBe(Buffer.byteLength(line("old", now - 5 * 86400000)));
+  } finally {
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  }
 });
 
 test("report excludes older meals and duplicates", () => {

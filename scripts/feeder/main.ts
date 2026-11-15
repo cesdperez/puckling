@@ -96,14 +96,11 @@ export async function runOnce(args: string[], backfill?: string) {
   let state = loadState();
   const first = !state;
   state ||= emptyState();
-  if (first && backfill === undefined) startFromNow(state, now);
-  const since =
-    first && backfill !== undefined
-      ? now - Number(backfill) * 86400000
-      : first
-        ? now
-        : 0;
-  const eaten = applyMeals(state, await scan(state, since), since, now);
+  if (first) {
+    state.since = backfill === undefined ? now : now - Number(backfill) * 86400000;
+    if (backfill === undefined) startFromNow(state, now);
+  }
+  const eaten = applyMeals(state, await scan(state, state.since), state.since, now);
   saveState(state);
   const line = formatFood(state);
   console.log(
