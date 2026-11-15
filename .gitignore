@@ -1,4 +1,7 @@
 node_modules/
-.gea/build/
 dist/
+.gea/*
+!.gea/boards.json
 sim.png
+.DS_Store
+*.log
