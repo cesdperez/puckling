@@ -24,6 +24,7 @@
     ".gea",
     "vite.config.ts",
     "vite.web.config.ts",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "scripts/feeder"
   ]
 }

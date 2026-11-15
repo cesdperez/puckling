@@ -5,13 +5,15 @@
   "type": "module",
   "scripts": {
     "sim": "node scripts/sim.mjs",
-    "test": "bun test src/pet",
+    "test": "bun test src/pet scripts/feeder",
     "check": "tsc --noEmit",
     "build:firmware": "gea build --board puck",
     "flash": "gea flash --board puck",
     "monitor": "gea monitor --board puck",
     "screenshot": "gea screenshot --board puck",
-    "sim:screenshot": "node scripts/sim-screenshot.mjs"
+    "sim:screenshot": "node scripts/sim-screenshot.mjs",
+    "feed": "bun scripts/feeder/main.ts",
+    "feed:report": "bun scripts/feeder/main.ts --report --days 7"
   },
   "dependencies": {
     "@geajs/core": "^1.3.0",

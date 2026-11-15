@@ -1,0 +1,64 @@
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
+import type { Usage } from "./weigh";
+export type Tool = "claude" | "codex" | "opencode";
+export type Meal = {
+  id: string;
+  tool: Tool;
+  model: string;
+  session: string;
+  time: number;
+  usage: Usage;
+};
+export type State = {
+  offsets: Record<string, number>;
+  models: Record<string, string>;
+  hasRecords: Record<string, boolean>;
+  watermark: number;
+  seen: Record<string, number>;
+  counters: Record<"total" | Tool | "night" | "parallel", number>;
+  recent: {
+    session: string;
+    time: number;
+  }[];
+  lastSent?: string;
+};
+export const statePath = () =>
+  process.env.PUCKLING_FEEDER_STATE ||
+  join(homedir(), ".local/state/puckling/feeder.json");
+export function emptyState(): State {
+  return {
+    offsets: {},
+    models: {},
+    hasRecords: {},
+    watermark: 0,
+    seen: {},
+    counters: {
+      total: 0,
+      claude: 0,
+      codex: 0,
+      opencode: 0,
+      night: 0,
+      parallel: 0,
+    },
+    recent: [],
+  };
+}
+export function loadState(path = statePath()) {
+  return existsSync(path)
+    ? (JSON.parse(readFileSync(path, "utf8")) as State)
+    : null;
+}
+export function saveState(state: State, path = statePath()) {
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(state));
+  renameSync(tmp, path);
+}
