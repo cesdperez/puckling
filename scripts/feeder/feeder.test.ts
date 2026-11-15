@@ -8,7 +8,7 @@ import { weigh, modelFactor } from "./weigh";
 import { readClaude } from "./claude";
 import { readCodex } from "./codex";
 import { readOpencode } from "./opencode";
-import { applyMeals, countReport } from "./main";
+import { applyMeals, countReport, parseArgs, runOnce } from "./main";
 import { deliver, formatFood, formatFeed } from "./deliver";
 import { displayModel } from "./tokens";
 import { serve, feedUrl } from "./serve";
@@ -283,13 +283,13 @@ test("model names and raw meal tallies", () => {
   expect(state.days["2025-12-01"]).toBeUndefined();
 });
 
-test("feed format totals and groups models", () => {
+test("feed format totals and individual models", () => {
   const state = emptyState(), date = new Date(2026, 0, 2, 12);
   state.generation = 42;
   state.days["2026-01-02"] = 12;
   for (let i = 1; i <= 7; i++) state.tokens[`m${i}`] = { input: i, output: 1, cacheRead: 2, cacheWrite: 3 };
   state.tokens.zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-  expect(formatFeed(state, date)).toBe(`1 0 0 0 0 0 0 ${-date.getTimezoneOffset()} 42\n1 42 70 28 7 14 21 12\nm7 13\nm6 12\nm5 11\nm4 10\nm3 9\nother 15\n`);
+  expect(formatFeed(state, date)).toBe(`1 0 0 0 0 0 0 ${-date.getTimezoneOffset()} 42\n1 42 70 28 7 14 21 12\nm7 13\nm6 12\nm5 11\nm4 10\nm3 9\nm2 8\nm1 7\n`);
 });
 
 test("feed server waits for state and serves latest", async () => {
@@ -312,4 +312,43 @@ test("pair URL chooses first external IPv4", () => {
   const entry = (address: string, family: "IPv4" | "IPv6", internal: boolean) => ({ address, family, internal, netmask: "", mac: "", cidr: null, ...(family === "IPv6" ? { scopeid: 0 } : {}) }) as import("node:os").NetworkInterfaceInfo;
   expect(feedUrl({ lo: [entry("127.0.0.1", "IPv4", true)], en: [entry("::1", "IPv6", false), entry("192.168.1.2", "IPv4", false)] }, 7878)).toBe("http://192.168.1.2:7878/feed");
   expect(() => feedUrl({}, 7878)).toThrow();
+});
+
+
+test("feed caps model lines at 24 with stable name ordering", () => {
+  const state = emptyState(), date = new Date(2026, 0, 2);
+  for (let i = 1; i <= 26; i++) state.tokens[`m${String(i).padStart(2, "0")}`] = { input: i < 4 ? 1 : i, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const lines = formatFeed(state, date).trimEnd().split("\n").slice(2);
+  expect(lines).toHaveLength(24);
+  expect(lines.slice(0, 2)).toEqual(["m26 26", "m25 25"]);
+  expect(lines.slice(-2)).toEqual(["m04 4", "m01 1"]);
+});
+
+test("serve arguments validate before any server starts", async () => {
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
+  const port = server.port;
+  server.stop();
+  for (const args of [["--serve", String(port), "--watch", "0"], ["--serve", String(port)], ["--pair"], ["--serve", "65536", "--watch", "1"], ["--serve", String(port), "--watch", "1", "--days", "0"], ["--serve", String(port), "--watch", "1", "--backfill", "0"]]) {
+    expect(() => parseArgs(args)).toThrow();
+  }
+  const probe = Bun.serve({ hostname: "127.0.0.1", port, fetch: () => new Response() });
+  probe.stop();
+});
+
+test("serve skips USB delivery and sim still writes food", async () => {
+  const d = dir();
+  const keys = ["PUCKLING_FEED_DIR", "PUCKLING_FEEDER_STATE", "PUCKLING_CLAUDE_DIR", "PUCKLING_CODEX_DIR", "PUCKLING_OPENCODE_DB", "PATH"] as const;
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  Object.assign(process.env, { PUCKLING_FEED_DIR: d, PUCKLING_FEEDER_STATE: join(d, "state.json"), PUCKLING_CLAUDE_DIR: join(d, "none"), PUCKLING_CODEX_DIR: join(d, "none"), PUCKLING_OPENCODE_DB: join(d, "none.db"), PATH: "" });
+  try {
+    await runOnce(["--serve", "1234"]);
+    expect(existsSync(join(d, "food.txt"))).toBe(false);
+    await runOnce(["--serve", "1234", "--sim"]);
+    expect(readFileSync(join(d, "food.txt"), "utf8")).toMatch(/^1 /);
+  } finally {
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  }
 });

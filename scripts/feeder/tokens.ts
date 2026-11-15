@@ -11,3 +11,7 @@ export function localDay(date: Date) {
 export function tokenTotal(usage: Usage) {
   return usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
 }
+
+export function addUsage(target: Usage, usage: Usage): void {
+  for (const key of Object.keys(target) as (keyof Usage)[]) target[key] += usage[key];
+}

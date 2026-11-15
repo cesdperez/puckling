@@ -11,7 +11,7 @@ import {
 } from "./state";
 import { weigh } from "./weigh";
 import { deliver, formatFood } from "./deliver";
-import { displayModel, localDay, tokenTotal } from "./tokens";
+import { addUsage, displayModel, localDay, tokenTotal } from "./tokens";
 import { pair, serve } from "./serve";
 function newMeal(meal: Meal, since: number, seen: Record<string, number>): boolean {
   if (!Number.isFinite(meal.time) || meal.time < since || seen[meal.id] !== undefined) return false;
@@ -29,7 +29,7 @@ export function applyMeals(
     if (!newMeal(m, since, state.seen)) continue;
     const model = displayModel(m.model);
     const usage = state.tokens[model] ??= { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-    for (const key of Object.keys(usage) as (keyof typeof usage)[]) usage[key] += m.usage[key];
+    addUsage(usage, m.usage);
     const day = localDay(new Date(m.time));
     state.days[day] = (state.days[day] ?? 0) + tokenTotal(m.usage);
     const kcal = weigh(m.usage, m.model) / 1000;
@@ -91,7 +91,7 @@ async function report(days: number) {
     `claude ${totals.claude.toFixed(2)} (${counts.claude} meals)\ncodex ${totals.codex.toFixed(2)} (${counts.codex} meals)\nopencode ${totals.opencode.toFixed(2)} (${counts.opencode} meals)\ntotal ${total.toFixed(2)}\nper-day ${(total / days).toFixed(2)}`,
   );
 }
-async function runOnce(args: string[], backfill?: string) {
+export async function runOnce(args: string[], backfill?: string) {
   const now = Date.now();
   let state = loadState();
   const first = !state;
@@ -128,8 +128,7 @@ function value(args: string[], flag: string) {
     throw new Error(`Missing value for ${flag}`);
   return args[i + 1];
 }
-async function main() {
-  const args = process.argv;
+export function parseArgs(args: string[]) {
   const days = Number(value(args, "--days") ?? 7);
   const backfill = value(args, "--backfill");
   const watch = value(args, "--watch");
@@ -138,10 +137,8 @@ async function main() {
   const pairing = args.includes("--pair");
   if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) throw new Error("Invalid serve port");
   if (pairing && port === undefined) throw new Error("--pair requires --serve");
-  if (pairing) return pair(port!, value(args, "--port"));
-  if (port !== undefined && !watch) throw new Error("--serve requires --watch");
-  let latest: State | undefined;
-  if (port !== undefined) serve(port, () => latest);
+  const devicePort = value(args, "--port");
+  if (port !== undefined && !watch && !pairing) throw new Error("--serve requires --watch");
   if (
     !Number.isFinite(days) ||
     days <= 0 ||
@@ -151,7 +148,15 @@ async function main() {
       (!Number.isFinite(Number(watch)) || Number(watch) <= 0))
   )
     throw new Error("Days and watch interval must be positive numbers");
-  if (args.includes("--report")) return report(days);
+  return { days, backfill, watch, port, pairing, devicePort, report: args.includes("--report") };
+}
+async function main() {
+  const args = process.argv;
+  const { days, backfill, watch, port, pairing, devicePort, report: isReport } = parseArgs(args);
+  if (isReport) return report(days);
+  if (pairing) return pair(port!, devicePort);
+  let latest: State | undefined;
+  if (port !== undefined) serve(port, () => latest);
   do {
     try {
       latest = await runOnce(args, backfill);
