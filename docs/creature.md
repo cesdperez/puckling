@@ -23,20 +23,24 @@ kcal = weighted * model_factor / 1000
 
 `model_factor` makes a strong model richer food than a cheap one; the table is in `scripts/feeder/weigh.ts`. Dedupe is by message id, plus a byte offset per file and a watermark for the opencode database. Feeder state is `~/.local/state/puckling/feeder.json`.
 
-The feeder sends one cumulative line, and the creature polls it every 2 seconds:
+The creature re-reads its food every 2 seconds: the Wi-Fi body when there is one, otherwise the `food` key that USB delivery writes, otherwise `feed/food.txt` in the sim. The Wi-Fi client requests `/feed` every 5 seconds. The body starts with the food line, then the token totals:
 
 ```
 1 total claude codex opencode night parallel tzMinutes generation
+1 <generation> <total> <input> <output> <cacheRead> <cacheWrite> <today>
+<model> <tokens>
 ```
 
-All values except `tzMinutes` and `generation` are kcal since the feeder state began.
+All food values except `tzMinutes` and `generation` are kcal since the feeder state began.
 
 - `night` is the kcal eaten between 22:00 and 07:00 local time.
 - `parallel` is the kcal eaten while three or more sessions were active in the last 10 minutes. Subagents count as their own session.
 - `tzMinutes` is the feeder's UTC offset at send time, so sleep lands on the user's clock.
 - `generation` changes when the feeder state is reset. The creature then takes the line as a new baseline instead of a jump backwards.
 
-The creature turns the counters into shares of the diet over the teen stage.
+Line 2 repeats the generation, then raw tokens since the feeder state began: total, input, output, cache read, cache write, and today's total on the local day. Then one `<model> <tokens>` line for every model with tokens, sorted by size, at most 24, and never an `other` line. The puck groups everything past the five largest into `other` on the tokens page, which keeps each model's evolution snapshot stable. Model names are lower-cased, with a leading `claude-` and any 8-digit date suffix stripped, so `claude-haiku-4-5-20251001` reads `haiku-4-5`.
+
+The creature turns the counters into shares of the diet over the teen stage. The token totals drive the stats pages only; growth still follows the weighted kcal.
 
 ## Life cycle
 
@@ -61,6 +65,21 @@ One step is about two days of the user's food. Measured over a week of real use:
 It never leaves the inscribed circle of the round panel, and the drawing fades to 30 percent after 60 seconds without a tap. `src/render.ts` scales the colours because the DOM sim ignores `Display.setBrightness`. This rests the AMOLED, which burns in under static light.
 
 The behaviour is deterministic from a seed, so `bun test src/pet` can replay it and assert it, and the same code runs in the sim and on the device.
+
+## Screens and names
+
+Swipe left or right to move between four pages. A dot row under the centre marks the current one.
+
+- 0 home: the creature, with a dim `LV <n> <name>` label across the bottom.
+- 1 evo: the level, the stage and branch, the evo name, and a progress ring around the bezel, with `next evo NN%` or `max lv` at the final form, and `+X tok since evo`.
+- 2 tokens per model: the top five models plus `other`, each with its lifetime total and the tokens gained since the last evolution.
+- 3 sys: total tokens, today, input and output, cache read and write, battery, Wi-Fi RSSI, and the age of the last feed.
+
+The stats pages return to home after 20 seconds without a touch, so static text does not burn into the AMOLED. A tap reaches the creature on home only.
+
+Level is the stage index: egg 0 through final 5. Each evolution picks a random docker-style `<adjective>_<nerd>` name, and both the name and a per-model token snapshot are stored under the NVS key `evo`. "since evo" is the current count minus the snapshot. A feeder generation reset re-snapshots and keeps the name.
+
+Battery is a thin arc at the top of the bezel. It shows on every stats page, and on home only at 20 percent or below or while charging.
 
 ## Calm rules
 
@@ -90,6 +109,5 @@ Not built yet.
 - Poop is unread work: one per finished session the user has not looked at, cleaned by tapping, which switches to that session on the Mac. Too much makes it mildly sick.
 - Energy is the rate limit: it gets sleepy as the Claude limit fills and wakes when it resets.
 - Mute by turning the puck face down, unmute by picking it up. That needs the IMU, as does any other tilt input.
-- Wi-Fi or BLE transport instead of the USB cable, so the feeder need not be plugged in.
 - Sound, once there is an event worth one, under the calm rules.
-- More screens. A round 466x466 display holds one thought: stats, one baby per live agent, usage limits, settings. A bezel wheel drag would turn between them, and the creature stays visible on each so its state is never hidden. Menus on long press act on the selected agent.
+- More screens: one baby per live agent, usage limits, settings, and the creature visible on every page. A bezel wheel drag would turn between them. Menus on long press act on the selected agent.
