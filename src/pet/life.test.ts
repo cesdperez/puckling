@@ -19,10 +19,10 @@ describe("life", () => {
     expect(again.evolved).toBe(false);
   });
   test("surplus advances one stage per call and resets diet", () => {
-    const meal = food(5000);
+    const meal = food(threshold("final"));
     let result = feed(createLife(), meal);
     expect(result.life.stage).toBe("baby");
-    expect(result.life.lifetime).toBe(5000);
+    expect(result.life.lifetime).toBe(threshold("final"));
     result = feed(result.life, meal);
     expect(result.life.stage).toBe("child");
     result = feed(result.life, meal);

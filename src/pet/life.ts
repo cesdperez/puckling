@@ -4,7 +4,8 @@ export type Food = { total: number; claude: number; codex: number; opencode: num
 export type Life = { stage: Stage; branch: Branch; lifetime: number; fullness: number; diet: Food; last: Food; seen: boolean };
 export const STAGES: Stage[] = ["egg", "baby", "child", "teen", "adult", "final"];
 export const BRANCHES: Branch[] = ["none", "ember", "frost", "moss", "night", "swarm"];
-export const STAGE_KCAL = 1000;
+// Two days of food at the measured pace; the measurement and reasoning live in docs/creature.md.
+export const STAGE_KCAL = 160000;
 export const HATCH_KCAL = STAGE_KCAL / 2;
 export const MEAL_KCAL = STAGE_KCAL / 8;
 export const HUNGER_HOURS = 16;
