@@ -2,6 +2,11 @@
   "puck": {
     "target": "esp32-s3-touch-amoled-1.75c",
     "adapter": "esp32-idf",
-    "appPlatform": "esp32"
+    "appPlatform": "esp32",
+    "transports": {
+      "usbSerial": {
+        "serial": "84:C7:BB:77:45:F0"
+      }
+    }
   }
 }
