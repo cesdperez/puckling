@@ -1,13 +1,10 @@
 # puckling
 
-Read README.md first, then the doc in `docs/` for the area you touch. The approved Pebble contract and images live in `docs/pebble-design.md` and `docs/design/`.
+A GeaStack app: one orange pet on a round 466x466 canvas, running in the browser sim and on a Waveshare ESP32-S3-Touch-AMOLED-1.75C.
 
-- The board is the **1.75C**. Take pins from `docs/hardware.md`. Community code for the plain 1.75 has different pins.
-- Business logic goes in the daemon. Firmware renders state and reports input.
-- Before building on an Orca command, check it with `orca <command> --help` and a real `--json` run. Orca ships daily and the CLI changes.
-- Copy code only from projects whose license allows it. `docs/prior-art.md` lists each license.
-- Record architecture decisions and their reasons in `docs/architecture.md`. Keep supported behavior separate from pending hardware work.
-
-- Keep `ui.cpp`, sprite data and protocol handling shared by simulator and firmware. Reproduce sprite assets with `python3 tools/build_sprites.py`.
-- `make validate-sim` uses synthetic Orca only. Put screenshots/logs in ignored `sim/build/validation/`; record validation boundaries in `docs/validation.md`.
-- `make firmware` compiles without uploading. Physical display, touch and sensor behavior require separate device checks.
+- `src/pet/pet.ts` is the whole creature: pure TypeScript, no GeaStack imports, deterministic from a seed. New behaviour goes there, with a case in `src/pet/pet.test.ts`, so it runs on the device and in `bun test`. `src/render.ts` only draws the pose, `src/App.tsx` only runs the loop and turns pointer events into taps.
+- Board and target facts are in `docs/hardware.md`. Read it before touching `.gea/boards.json`, pins or display brightness. The alias `puck` points at GeaStack target `esp32-s3-touch-amoled-1.75c`; the plain `esp32-s3-touch-amoled-1.75` is a different board.
+- Do not flash without the user's explicit go-ahead. Flashing replaces the puck's current firmware (Watt), which only Watt's web installer restores.
+- Visual proof comes from `npm run sim:screenshot`, which needs the sim already running.
+- Creature design, the calm sound rules and the long-term vision are in `docs/creature.md`. Read it before adding behaviour or sound.
+- Commands in `package.json` are the list; README explains the ones that are not obvious.

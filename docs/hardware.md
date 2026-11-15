@@ -13,6 +13,14 @@ Board: **Waveshare ESP32-S3-Touch-AMOLED-1.75C**. Same board Watt uses.
 | Speaker | ES8311 codec + amp | I2S |
 | Radio | Wi-Fi 2.4 GHz, BLE 5 | |
 
+## GeaStack target
+
+`.gea/boards.json` aliases `puck` to the upstream GeaStack target `esp32-s3-touch-amoled-1.75c`. That target carries this board's pins, flash size, CO5300 panel, AXP2101 PMU and CST9217 touch, so the app never spells out pins itself.
+
+The plain `esp32-s3-touch-amoled-1.75` is a different board with different pins. Do not swap one target for the other.
+
+`npx gea doctor` reports the toolchain state. GeaStack setup does not install ESP-IDF or CMake; install both, with ESP-IDF v6, before the first firmware build.
+
 ## Pins (1.75C)
 
 From `examples/arduino/libraries/board_config` in the official 1.75C repo.
@@ -43,6 +51,7 @@ From `examples/arduino/libraries/board_config` in the official 1.75C repo.
 - The panel is round. Anything outside the inscribed circle of the 466x466 buffer is invisible.
 - AMOLED burns in. Static elements need dimming or a slow drift (TamaPoke does anti-burn-in dimming).
 - Flashing our firmware wipes Watt. Watt's web installer restores it.
+- `geatsc` cannot log a pointer event object; log its fields.
 
 ## Sources
 
@@ -50,9 +59,3 @@ From `examples/arduino/libraries/board_config` in the official 1.75C repo.
   - ESP-IDF managed component: `waveshare/esp32_s3_touch_amoled_1_75c`
   - Arduino examples: HelloWorld, GFX, LVGL + AXP2101, LVGL + QMI8658, LVGL widgets, ES7210 mics, ES8311 speaker
 - Wiki: https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75
-
-## Pebble firmware validation boundary
-
-The v2 firmware retains these board pins and the existing CO5300 canvas/dirty-region driver. The companion draws the full circular UI at up to 15 frames per second, dims after 60 seconds without touch, and restores brightness on touch. CST9217 interrupt reports track finger movement; a 120 ms quiet gap synthesizes release if no explicit release arrives.
-
-This implementation was compiled with PlatformIO and checked in the native simulator. It was not uploaded or tested on a physical puck. Touch cadence, release timing, USB responsiveness, frame rate and AMOLED brightness remain device checks. QMI8658 initialization and motion access remain available, but session navigation uses touch. Audio, lift-to-wake, face-down mute and twist control are not implemented.

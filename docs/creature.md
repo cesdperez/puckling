@@ -1,29 +1,69 @@
-# Pebble
+# Creature
 
-Pebble is the compact round orca calf selected in the [approved character sheet](design/pebble-character.png). It accompanies sessions; it has no care, diet or progression loop.
+Puckling is one small orange creature on a round screen. Today it is a toy that reacts to touch. The goal is a Tamagotchi-style companion that eats the tokens Claude Code spends, shows what the Orca sessions on this Mac are doing, and grows over days and weeks.
 
-## Appearance and provenance
+## Now
 
-Keep a bean-shaped body, blunt snout, stubby dorsal, little paddle flippers, forked tail, ivory chin and belly, white oval patches, small dark actual eyes, and a crooked smile. The palette is charcoal, navy, slate and warm ivory. Status color belongs to icons and words, not changing character markings.
+- Drawn procedurally from rectangles on a single canvas, sized by `src/pet/pet.ts`. No sprites, no assets.
+- Idle: blinks every few seconds, looks left and right, drifts a little, squashes and stretches gently.
+- Tap the body: it flinches, then hops, then calms.
+- Tap elsewhere on screen: it walks to that point, turns to face the way it goes, then looks around.
+- It never leaves the inscribed circle of the round panel.
+- After 60 seconds without a tap the display dims to 30 percent and the pet slows down. A tap restores brightness. This rests the AMOLED, which burns in under static light.
+- Silent. No sound, no network, no state outside the device.
 
-`tools/build_sprites.py` contains original polygon artwork authored for this repository under its MIT license, using the approved sheet as a visual reference. It copies no reference pixels or third-party sprites. Run it with Python 3 to reproduce the five indexed PNGs under `firmware/assets/` and the static pixel rows in `firmware/src/sprites.h`. The firmware reads those rows at integer scale, without interpolation. The reference images remain intact in `docs/design/`.
+The behaviour is deterministic from a seed, so `bun test src/pet` can replay it and assert it, and the same code runs in the sim and on the device.
 
-## Expressions
+## Calm rules
 
-| State | Pebble | Explicit UI |
+The puck sits next to the user all day. It must never nag.
+
+- One sound per event, never repeated. No escalation if it goes unanswered. No looping alarm.
+- Sounds are short and soft. A chirp, not a beep. One global volume, low by default.
+- Batch events. Several sessions finishing within a few seconds give one sound, not several.
+- Quiet hours. At night it sleeps and makes no sound. Events only change the picture.
+- Visual over audio. The lasting signal is on screen: the creature looks at the user, or leaves a mess on the floor. Sound only says something changed.
+- Unhappy states stay mild. Hunger, boredom and sickness show as a slower, droopier creature. It never flashes, shakes or calls for attention.
+- Mute by turning the puck face down, unmute by picking it up. Needs the IMU and is not implemented.
+
+## Future: food from tokens
+
+Claude Code writes one JSONL file per session under `~/.claude/projects/<project>/<session>.jsonl`, and each assistant line carries token usage. Tailing those files gives the creature its food, with a byte offset per file so a restart does not double count, and deduplication by message id because one response can appear on several lines. Codex sessions under `~/.codex/sessions/` can come later.
+
+Raw counts are dominated by cache reads, which are cheap. Weight them roughly by cost so the creature grows from work, not from long contexts:
+
+```
+calories = output * 5 + input * 1 + cache_creation * 1.25 + cache_read * 0.1
+```
+
+A model factor makes Opus richer food than Haiku. Tune the constants by replaying a week of real transcripts.
+
+## Future: behaviour from sessions
+
+Orca session state drives what the creature does.
+
+| Sessions | Creature | Sound |
 |---|---|---|
-| Idle / all clear | Gentle hovering, blinking, occasional tail movement | All clear, working/monitoring counts, Browse sessions |
-| Working | Head down toward a small work tile, focused eyes, engaged paddles | Work icon and Working, muted blue-gray |
-| Monitoring | Calm idle pose | Bars and Monitoring, muted blue-gray |
-| Needs input / attention | Faces the user with a politely raised paddle | Bubble and words, amber |
-| Successful finish | Restrained happy pose briefly, then calm | Check and Finished, mint |
-| Failure | Mild concern, persistent | Exclamation and Failed, coral |
-| Unknown / lost link | Calm pose | Status unknown / Connection lost, freshness text, disabled action |
+| None running | Idle, looks around, gets bored | none |
+| Some working | Busy: bobs, reads | none |
+| One goes done | Eats, happy for a moment | soft chirp |
+| One goes waiting or blocked | Turns to face the user and stays that way | soft nudge, once |
+| One stuck working for long | Looks a little worried | none |
 
-## Calm notifications and AMOLED
+## Future: life cycle
 
-Requests persist visually. The daemon advances a cue counter for new attention events, with a three-second batching interval. Firmware gives a brief visual dot for a changed counter; acknowledged unresolved requests do not repeat their cue. New completions require an observed transition, not a worktree unread flag. No screen is forcibly changed.
+- Stats: hunger drains over real time and refills with calories; mood and energy alongside.
+- Growth by lifetime calories: egg, baby, child, teen, adult, then a final form.
+- Evolution branch picked by diet over the previous stage. Mostly Opus gives a wise form, mostly Haiku or Sonnet a fast small one, many parallel worktrees a many-headed one, night-time feeding a nocturnal one.
+- Neglect makes it hungry and sad. It never dies; it sulks and loses progress toward the next evolution.
+- Poop is unread work: one per finished session the user has not looked at, cleaned by tapping, which switches to that session on the Mac. Too much makes it mildly sick.
+- Energy is the rate limit: it gets sleepy as the Claude limit fills and wakes when it resets.
+- Sleep at night on the real-time clock, dimming the screen, which also protects the AMOLED.
 
-Sound is not implemented. The intended hardware policy is one short soft cue per batch, respecting mute, with no alarm loop or escalation. Mute, quiet hours, lift-to-wake and face-down sensing are pending. Failure has no repeated alarm animation.
+## Future: interaction and screens
 
-Pebble moves subtly on the logical grid. The firmware dims the panel after 60 seconds without touch and restores brightness on touch. Brightness, burn-in mitigation over long use and sensor timing require physical validation. No hardware validation is claimed by simulator screenshots.
+Beyond tap: face down to mute, pick up to wake, tap a poop to clean it, long press for a menu.
+
+Everything past the creature needs more screens, because a round 466x466 display holds one thought: stats, one baby per live agent, usage limits, settings. A bezel wheel drag turns between them, and the creature stays visible on each so its state is never hidden. Menus on long press act on the selected agent.
+
+Not built: transport to the Mac over USB, Wi-Fi or BLE, sound with the calm rules, growth and evolution, IMU input such as tilt, spin and face-down mute.
