@@ -13,12 +13,18 @@ function text(ctx: Context, value: string, x: number, y: number, size: number, c
   ctx.font = size + 'px monospace'
   ctx.fillStyle = color
   let width = ctx.measureText(value), center = size / 2
-  try { center = ctx.measureTextInkCenter(value) } catch {}
-  if (typeof width !== 'number') width = (width as unknown as { width: number }).width
+  try { center = ctx.measureTextInkCenter(value) } catch { width = (ctx.measureText(value) as any).width }
+  if (width === 0) width = value.length * Math.round(size / 2)
+  if (center === 0) center = size / 2
   ctx.fillText(value, x - width / 2, y - center)
 }
 function arc(ctx: Context, radius: number, width: number, start: number, end: number, color: string): void {
-  ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.arc(233, 233, radius, start, end); ctx.stroke()
+  const count = Math.max(1, Math.ceil((end - start) * radius / (width / 2)))
+  ctx.fillStyle = color
+  for (let i = 0; i <= count; i++) {
+    const angle = start + (end - start) * i / count
+    ctx.beginPath(); ctx.arc(233 + radius * Math.cos(angle), 233 + radius * Math.sin(angle), width / 2, 0, Math.PI * 2); ctx.fill()
+  }
 }
 function battery(ctx: Context, level: number, charging: boolean, label: boolean): void {
   const start = -Math.PI / 2 - Math.PI * 25 / 180, span = Math.PI * 50 / 180
@@ -63,7 +69,7 @@ export function drawScreen(ctx: Context, page: number, d: ScreenData): void {
     text(ctx, '+' + formatTokens(total) + ' tok since evo', 233, 326, 16, DIM)
   } else if (page === 2) {
     text(ctx, 'tok / model', 233, 87, 25, TEXT)
-    text(ctx, 'Σ ' + formatTokens(t.total) + ' · +' + formatTokens(total), 233, 120, 18, DIM)
+    text(ctx, 'sum ' + formatTokens(t.total) + ' / +' + formatTokens(total), 233, 120, 18, DIM)
     const models = sinceEvo(d.evo, t)
     for (let i = 0; i < t.models.length && i < 5; i++) {
       const y = 158 + i * 40
@@ -83,7 +89,7 @@ export function drawScreen(ctx: Context, page: number, d: ScreenData): void {
       text(ctx, '+' + formatTokens(since), 308, 375, 12, DIM)
     }
   } else {
-    text(ctx, 'Σ ' + formatTokens(t.total) + ' tok', 233, 105, 27, TEXT)
+    text(ctx, 'sum ' + formatTokens(t.total) + ' tok', 233, 105, 27, TEXT)
     text(ctx, 'today ' + formatTokens(t.today), 233, 151, 20, TEXT)
     text(ctx, 'in ' + formatTokens(t.input) + '  out ' + formatTokens(t.output), 233, 190, 17, TEXT)
     text(ctx, 'cache r ' + formatTokens(t.cacheRead) + ' w ' + formatTokens(t.cacheWrite), 233, 228, 17, TEXT)

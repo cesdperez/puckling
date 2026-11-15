@@ -34,6 +34,9 @@ The `puck` alias carries this puck's USB serial, so flash, monitor and screensho
 - NVS keys are at most 15 characters, and `localStorage` on the device is NVS. That is why the keys are `food`, `life`, `evo` and `feedkey`.
 - `geatsc` fails on `JSON.stringify` of an optional value. Pass a defined value, or stringify it behind a guard.
 - `fillText` anchors the top-left of the text, and `textAlign` does nothing. Centre a string yourself with `measureText` and subtract half the width.
+- Without a baked font atlas, the device draws a scaled 8x16 bitmap font but `measureText` and `measureTextInkCenter` return zero. Its ASCII cell width is `round(fontSize / 2)`.
+- The bitmap font does not contain `Σ`. Use ASCII text.
+- Canvas `stroke()` treats an arc as a one-pixel full circle rather than a partial thick arc. Use filled circles for thick arcs.
 - The browser sim's `Battery` has `level()` only, with no `charging()`, and no `measureTextInkCenter`. Calls to those sit in `try`/`catch`.
 - `gea devctl storage set <key> <value>` writes the app's NVS-backed `localStorage`. It presets the food line the feeder sends, and `storage set life 0` resets growth, because the text does not parse as a life. The running app overwrites the key on its next save, so reboot straight after a reset.
 - The browser sim has no Clock host binding. `src/App.tsx` catches that and falls back to `Date.now()` for wall time, so night still works in the sim.
