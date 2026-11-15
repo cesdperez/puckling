@@ -1,5 +1,5 @@
 {
-  "name": "gea-puckling",
+  "name": "puckling",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,8 @@
     "build:firmware": "gea build --board puck",
     "flash": "gea flash --board puck",
     "monitor": "gea monitor --board puck",
-    "screenshot": "gea screenshot --board puck"
+    "screenshot": "gea screenshot --board puck",
+    "sim:screenshot": "node scripts/sim-screenshot.mjs"
   },
   "dependencies": {
     "@geajs/core": "^1.3.0",
@@ -18,9 +19,10 @@
     "@geastack/targets": "^0.1.101"
   },
   "devDependencies": {
+    "@geastack/cli": "^0.1.109",
+    "playwright": "1.65.1",
     "typescript": "^5.9.3",
-    "vite": "latest",
-    "@geastack/cli": "^0.1.109"
+    "vite": "8.3.8"
   },
   "gea": {
     "id": "puckling",

@@ -1,18 +1,36 @@
-import { Component, type GeaCanvasElement } from '@geastack/core'
+import { Component, Display, type GeaCanvasElement } from '@geastack/core'
+import { createPet, step, pose, SIZE } from './pet/pet'
+import { drawFrame } from './render'
 
 export class App extends Component<GeaCanvasElement> {
+  private pet = createPet(12345)
+  private tap: { x: number; y: number } | undefined
+  private lastFrame = 0
+  private brightness = -1
+
   template() {
-    return <canvas width={466} height={466} onPointerDown={(event) => console.log('pointerdown', event.clientX, event.clientY)} onPointerUp={(event) => console.log('pointerup', event.clientX, event.clientY)} />
+    return <canvas width={SIZE} height={SIZE} onPointerDown={(event) => { this.tap = { x: event.clientX, y: event.clientY } }} />
   }
 
   onAfterRender() {
     if (!this.el) return
     const ctx = this.el.getContext('2d')
-    ctx.fillStyle = '#000000'
-    ctx.fillRect(0, 0, 466, 466)
-    ctx.fillStyle = '#ff8000'
-    ctx.beginPath()
-    ctx.arc(233, 233, 80, 0, Math.PI * 2)
-    ctx.fill()
+    const frame = (time: number) => {
+      if (time - this.lastFrame >= 33 || this.lastFrame === 0) {
+        const dt = this.lastFrame === 0 ? 0 : (time - this.lastFrame) / 1000
+        this.lastFrame = time
+        this.pet = step(this.pet, { tap: this.tap }, dt)
+        this.tap = undefined
+        const p = pose(this.pet)
+        const brightness = Math.round(p.brightness * 100)
+        if (brightness !== this.brightness) {
+          Display.setBrightness(brightness)
+          this.brightness = brightness
+        }
+        drawFrame(ctx, p, this.pet.y)
+      }
+      requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
   }
 }
