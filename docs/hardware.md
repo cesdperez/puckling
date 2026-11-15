@@ -28,6 +28,7 @@ The `puck` alias carries this puck's USB serial, so flash, monitor and screensho
 - AMOLED burns in under static light. Keep the idle dim and drift described in [creature.md](creature.md).
 - Flashing replaces whatever firmware is on the board. Watt's web installer restores Watt.
 - `geatsc` cannot log a pointer event object; log its fields.
+- `geatsc` cannot use the canvas context as a WeakMap key, since a native handle has no reference identity on the device; keep per-canvas state on an object the component owns.
 - `gea flash`, `gea monitor`, `gea screenshot` and `gea devctl` accept `--port <dev>`, although their help does not list it.
 - Right after a flash, `gea screenshot` returns `display-unavailable` and `gea devctl summary` times out until the app finishes booting. Wait a few seconds, or reboot the board.
 
@@ -35,4 +36,3 @@ The `puck` alias carries this puck's USB serial, so flash, monitor and screensho
 
 - Official 1.75C repo, with pins, BSP and schematic: https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.75C
 - Wiki: https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75
-

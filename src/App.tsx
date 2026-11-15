@@ -1,6 +1,6 @@
 import { Component, type GeaCanvasElement } from '@geastack/core'
 import { createPet, step, pose, SIZE } from './pet/pet'
-import { drawFrame } from './render'
+import { FrameRenderer } from './render'
 
 const FRAME_MS = 1000 / 30
 const FRAME_TOLERANCE_MS = 4
@@ -17,6 +17,7 @@ export class App extends Component<GeaCanvasElement> {
   onAfterRender() {
     if (!this.el) return
     const ctx = this.el.getContext('2d')
+    const renderer = new FrameRenderer()
     const frame = (time: number) => {
       // rAF ticks every 16ms on the device, so an exact 33.3ms gate skips the 32ms tick and halves to 20fps
       if (time - this.lastFrame >= FRAME_MS - FRAME_TOLERANCE_MS || this.lastFrame === 0) {
@@ -25,7 +26,7 @@ export class App extends Component<GeaCanvasElement> {
         this.pet = step(this.pet, { tap: this.tap }, dt)
         this.tap = undefined
         const p = pose(this.pet)
-        drawFrame(ctx, p)
+        renderer.draw(ctx, p)
       }
       requestAnimationFrame(frame)
     }

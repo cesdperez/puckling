@@ -5,7 +5,7 @@ type Context2D = ReturnType<GeaCanvasElement['getContext']>
 
 const BACKGROUND = '#000000'
 const EYES = '#000000'
-const previousFrames = new WeakMap<Context2D, { bounds: Bounds; brightness: number }>()
+type Frame = { bounds: Bounds; brightness: number }
 
 function colour(r: number, g: number, b: number, brightness: number): string {
   const hex = '0123456789abcdef'
@@ -13,8 +13,7 @@ function colour(r: number, g: number, b: number, brightness: number): string {
   return '#' + hex[Math.floor(red / 16)] + hex[red % 16] + hex[Math.floor(green / 16)] + hex[green % 16] + hex[Math.floor(blue / 16)] + hex[blue % 16]
 }
 
-function clearDirty(ctx: Context2D, bounds: Bounds, brightness: number): void {
-  const previous = previousFrames.get(ctx)
+function clearDirty(ctx: Context2D, bounds: Bounds, brightness: number, previous: Frame | undefined): void {
   ctx.fillStyle = BACKGROUND
   if (!previous || previous.brightness !== brightness) {
     ctx.fillRect(0, 0, SIZE, SIZE)
@@ -25,11 +24,20 @@ function clearDirty(ctx: Context2D, bounds: Bounds, brightness: number): void {
     const bottom = Math.max(previous.bounds.y + previous.bounds.height, bounds.y + bounds.height)
     ctx.fillRect(x, y, right - x, bottom - y)
   }
-  previousFrames.set(ctx, { bounds, brightness })
 }
 
-export function drawFrame(ctx: Context2D, p: PetPose): void {
-  clearDirty(ctx, poseBounds(p), p.brightness)
+export class FrameRenderer {
+  private previous: Frame | undefined
+
+  draw(ctx: Context2D, p: PetPose): void {
+    const bounds = poseBounds(p)
+    clearDirty(ctx, bounds, p.brightness, this.previous)
+    this.previous = { bounds, brightness: p.brightness }
+    paint(ctx, p)
+  }
+}
+
+function paint(ctx: Context2D, p: PetPose): void {
   let part: string | undefined
   for (const rect of poseRects(p)) {
     if (rect.part !== part) {

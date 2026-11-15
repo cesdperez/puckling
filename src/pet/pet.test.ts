@@ -1,4 +1,4 @@
-import { drawFrame } from "../render";
+import { FrameRenderer } from "../render";
 import { describe, expect, test } from "bun:test";
 import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, poseBounds, poseRects, step } from "./pet";
 
@@ -37,12 +37,13 @@ describe("pet", () => {
     const calls: number[][] = [];
     const ctx = { fillStyle: "", fillRect: (x: number, y: number, width: number, height: number) => calls.push([x, y, width, height]) };
     const other = { ...ctx, fillRect: ctx.fillRect };
+    const renderer = new FrameRenderer(), otherRenderer = new FrameRenderer();
     let state = createPet(7);
     for (let i = 0; i < 100; i++) {
       state = step(state, i === 20 ? { tap: { x: SIZE, y: SIZE } } : {}, 1 / 30);
       const p = pose(state);
       calls.length = 0;
-      drawFrame(ctx as Parameters<typeof drawFrame>[0], p);
+      renderer.draw(ctx as Parameters<FrameRenderer["draw"]>[0], p);
       const [clear, ...paint] = calls;
       if (i === 0) expect(clear).toEqual([0, 0, SIZE, SIZE]);
       expect(paint).toEqual(poseRects(p).map(({ x, y, width, height }) => [x, y, width, height]));
@@ -54,10 +55,10 @@ describe("pet", () => {
       }
     }
     calls.length = 0;
-    drawFrame(other as Parameters<typeof drawFrame>[0], pose(state));
+    otherRenderer.draw(other as Parameters<FrameRenderer["draw"]>[0], pose(state));
     expect(calls[0]).toEqual([0, 0, SIZE, SIZE]);
     calls.length = 0;
-    drawFrame(ctx as Parameters<typeof drawFrame>[0], { ...pose(state), brightness: 0.3 });
+    renderer.draw(ctx as Parameters<FrameRenderer["draw"]>[0], { ...pose(state), brightness: 0.3 });
     expect(calls[0]).toEqual([0, 0, SIZE, SIZE]);
   });
 
