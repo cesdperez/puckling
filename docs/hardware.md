@@ -17,6 +17,8 @@ Board: **Waveshare ESP32-S3-Touch-AMOLED-1.75C**.
 
 `.gea/boards.json` aliases `puck` to the upstream GeaStack target `esp32-s3-touch-amoled-1.75c`. That target carries this board's pins, flash size, CO5300 panel, AXP2101 PMU and CST9217 touch, so the app never spells out pins itself.
 
+The `puck` alias also carries the board's USB serial, so flash, monitor and screenshot find it without a port argument. Set it with `npx gea boards set puck serial <serial> --local`, because a project alias replaces a home (`~/.geastack`) alias of the same name instead of merging its fields.
+
 `npx gea doctor` reports the toolchain state. GeaStack setup does not install ESP-IDF or CMake; install both, with ESP-IDF v6, before the first firmware build.
 
 ## Traps
@@ -26,6 +28,8 @@ Board: **Waveshare ESP32-S3-Touch-AMOLED-1.75C**.
 - AMOLED burns in under static light. Keep the idle dim and drift described in [creature.md](creature.md).
 - Flashing replaces whatever firmware is on the board. Watt's web installer restores Watt.
 - `geatsc` cannot log a pointer event object; log its fields.
+- `gea flash`, `gea monitor`, `gea screenshot` and `gea devctl` accept `--port <dev>`, although their help does not list it.
+- Right after a flash, `gea screenshot` returns `display-unavailable` and `gea devctl summary` times out until the app finishes booting. Wait a few seconds, or reboot the board.
 
 ## Sources
 
