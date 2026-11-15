@@ -1,12 +1,16 @@
 import { FrameRenderer } from "../render";
+import type { Stage, Branch } from "./life";
 import { describe, expect, test } from "bun:test";
 import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, step } from "./pet";
 
 import { poseBounds, poseRects } from "./shape";
 
+const adult = { stage: "adult" as const, branch: "ember" as const, fullness: 1, progress: 0, night: false };
+function walkingPet(seed: number) { return step(createPet(seed), { life: adult }, 0); }
+
 describe("pet", () => {
   test("pose bounds contain every painted rectangle", () => {
-    let state = createPet(7);
+    let state = walkingPet(7);
     const modes = new Set<string>();
     let worstOverflow = -Infinity;
     for (let i = 0; i < 6000; i++) {
@@ -27,7 +31,7 @@ describe("pet", () => {
   });
 
   test("bounds clamp at a canvas corner", () => {
-    const p = { x: 10, y: 10, groundY: 10, scaleX: 1, scaleY: 1, facing: 1 as const, eyeOpen: 1, lookX: 0, brightness: 1 };
+    const p = { ...pose(walkingPet(7)), x: 10, y: 10, groundY: 10 };
     const bounds = poseBounds(p);
     expect(bounds.x).toBe(0);
     expect(bounds.y).toBe(0);
@@ -65,12 +69,14 @@ describe("pet", () => {
   });
 
   test("is deterministic and does not mutate its input", () => {
-    let a = createPet(123), b = createPet(123);
+    let a = walkingPet(123), b = walkingPet(123);
     for (let i = 0; i < 1000; i++) {
       const original = a;
       const before = structuredClone(original);
       const input = i % 120 === 0 ? { tap: { x: i % 466, y: 30 } } : {};
+      const inputBefore = structuredClone(input);
       a = step(a, input, 1 / 30);
+      expect(input).toEqual(inputBefore);
       b = step(b, input, 1 / 30);
       expect(a).toEqual(b);
       expect(original).toEqual(before);
@@ -78,7 +84,7 @@ describe("pet", () => {
   });
 
   test("remains inside the visible circle for ten minutes", () => {
-    let state = createPet(7), seed = 1;
+    let state = walkingPet(7), seed = 1;
     let worstOverflow = -Infinity;
     for (let i = 0; i < 18000; i++) {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -103,7 +109,7 @@ describe("pet", () => {
   });
 
   test("petting flinches, hops, then calms", () => {
-    let state = step(createPet(1), { tap: { x: CENTER, y: CENTER } }, 0);
+    let state = step(walkingPet(1), { tap: { x: CENTER, y: CENTER } }, 0);
     expect(state.mode).toBe("flinch");
     expect(pose(state).eyeOpen).toBe(0);
     for (let i = 0; i < 4; i++) state = step(state, {}, 0.1);
@@ -116,7 +122,7 @@ describe("pet", () => {
   });
 
   test("walks to a clamped tap", () => {
-    let state = step(createPet(2), { tap: { x: 466, y: 466 } }, 0);
+    let state = step(walkingPet(2), { tap: { x: 466, y: 466 } }, 0);
     expect(state.mode).toBe("walk");
     const targetX = state.targetX, targetY = state.targetY;
     for (let i = 0; i < 500 && state.mode === "walk"; i++) state = step(state, {}, 0.1);
@@ -126,7 +132,7 @@ describe("pet", () => {
   });
 
   test("blinks within six seconds", () => {
-    let state = createPet(12), blinked = false;
+    let state = walkingPet(12), blinked = false;
     for (let i = 0; i < 60; i++) {
       state = step(state, {}, 0.1);
       if (pose(state).eyeOpen < 1) blinked = true;
@@ -135,7 +141,7 @@ describe("pet", () => {
   });
 
   test("dims after inactivity and wakes immediately", () => {
-    let state = createPet(4);
+    let state = walkingPet(4);
     for (let i = 0; i < 630; i++) state = step(state, {}, 0.1);
     expect(pose(state).brightness).toBeCloseTo(0.3);
     state = step(state, { tap: { x: CENTER, y: CENTER } }, 0);
@@ -143,12 +149,12 @@ describe("pet", () => {
   });
 
   test("long idle step dims and corner taps flinch", () => {
-    expect(pose(step(createPet(1), {}, 65)).brightness).toBeCloseTo(0.3);
-    expect(step(createPet(1), { tap: { x: 280, y: 170 } }, 0).mode).toBe("flinch");
+    expect(pose(step(walkingPet(1), {}, 65)).brightness).toBeCloseTo(0.3);
+    expect(step(walkingPet(1), { tap: { x: 280, y: 170 } }, 0).mode).toBe("flinch");
   });
 
   test("dim wandering continues at a slower speed", () => {
-    let dim = step(createPet(4), {}, 65);
+    let dim = step(walkingPet(4), {}, 65);
     let moved = false;
     for (let i = 0; i < 300; i++) {
       const before = dim;
@@ -157,15 +163,58 @@ describe("pet", () => {
       expect(dim.speed).toBeLessThanOrEqual(28 * 0.3 + 0.01);
     }
     expect(moved).toBe(true);
-    const walking = { ...createPet(1), mode: "wander" as const, targetX: CENTER + 80, speed: 0 };
+    const walking = { ...walkingPet(1), mode: "wander" as const, targetX: CENTER + 80, speed: 0 };
     let bright = walking, slow = { ...walking, sinceTap: 65 };
     for (let i = 0; i < 10; i++) { bright = step(bright, {}, 0.1); slow = step(slow, {}, 0.1); }
     expect(slow.x).toBeGreaterThan(CENTER);
     expect(slow.x).toBeLessThan(bright.x);
   });
 
+  test("all forms stay inside the circle", () => {
+    const forms: [Stage, Branch][] = [["egg", "none"], ["baby", "none"], ["child", "none"], ["teen", "none"]];
+    for (const stage of ["adult", "final"] as Stage[]) for (const branch of ["ember", "frost", "moss", "night", "swarm"] as Branch[]) forms.push([stage, branch]);
+    for (const [stage, branch] of forms) {
+      let state = createPet(8), seed = 42;
+      for (let i = 0; i < 18000; i++) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        const life = { stage, branch, fullness: 0.7, progress: 0.6, night: i % 6000 >= 3000 };
+        state = step(state, { life, tap: i % 251 === 0 ? { x: seed % 466, y: (seed >>> 10) % 466 } : undefined, meal: i % 479 === 0, evolved: i % 4000 === 0 }, 1 / 30);
+        for (const r of poseRects(pose(state))) for (const x of [r.x, r.x + r.width]) for (const y of [r.y, r.y + r.height]) expect(Math.hypot(x - CENTER, y - CENTER)).toBeLessThanOrEqual(VISIBLE_RADIUS + 0.001);
+      }
+    }
+  });
+
+  test("meal, evolution and sleep", () => {
+    let state = step(walkingPet(1), { meal: true }, 0);
+    expect(pose(state).pellet).toBeDefined();
+    state = step(state, { meal: true }, 0);
+    for (let i = 0; i < 240 && state.mode !== "idle"; i++) state = step(state, {}, 1 / 30);
+    expect(state.mode).toBe("idle"); expect(pose(state).pellet).toBeUndefined();
+    state = step(state, { life: { ...adult, stage: "final" }, evolved: true }, 0);
+    expect(pose(state).stage).toBe("adult");
+    for (let i = 0; i < 46; i++) state = step(state, {}, 1 / 30);
+    expect(pose(state).stage).toBe("final");
+    for (let i = 0; i < 46; i++) state = step(state, {}, 1 / 30);
+    expect(state.mode).toBe("idle"); expect(pose(state).formScale).toBe(1.1);
+    state = step(state, { life: { ...adult, night: true } }, 0);
+    for (let i = 0; i < 1200; i++) state = step(state, {}, 1 / 30);
+    expect(pose(state).asleep).toBe(true); expect(pose(state).brightness).toBeLessThanOrEqual(0.2); expect(pose(state).eyeOpen).toBe(0);
+    const day = step(state, { life: { ...adult, night: false } }, 0); expect(pose(day).asleep).toBe(false);
+    state = step(state, { tap: { x: CENTER, y: CENTER } }, 0); expect(pose(state).asleep).toBe(false);
+  });
+
+  test("egg stays put and hunger slows walking", () => {
+    let egg = createPet(3);
+    for (let i = 0; i < 1800; i++) egg = step(egg, { tap: i % 100 === 0 ? { x: 0, y: 0 } : undefined, meal: i % 200 === 0 }, 1 / 30);
+    expect(egg.x).toBe(CENTER); expect(egg.y).toBe(CENTER);
+    let fed = step(walkingPet(5), { tap: { x: 466, y: 233 } }, 0);
+    let hungry = step(walkingPet(5), { life: { ...adult, fullness: 0.1 }, tap: { x: 466, y: 233 } }, 0);
+    for (let i = 0; i < 30; i++) { fed = step(fed, {}, 1 / 30); hungry = step(hungry, {}, 1 / 30); }
+    expect(hungry.x).toBeLessThan(fed.x);
+  });
+
   test("clamps elapsed time", () => {
-    expect(step(createPet(5), {}, 0.5)).toEqual({ ...step(createPet(5), {}, 0.1), sinceTap: 0.5 });
-    expect(step(createPet(5), {}, -1)).toEqual(step(createPet(5), {}, 0));
+    expect(step(walkingPet(5), {}, 0.5)).toEqual({ ...step(walkingPet(5), {}, 0.1), sinceTap: 0.5 });
+    expect(step(walkingPet(5), {}, -1)).toEqual(step(walkingPet(5), {}, 0));
   });
 });
