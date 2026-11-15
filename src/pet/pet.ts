@@ -12,6 +12,7 @@ export const SHADOW_HALF_WIDTH = BODY_RADIUS * 0.53125;
 export const SHADOW_OFFSET = BODY_RADIUS * 1.015625;
 export const SHADOW_HEIGHT = BODY_RADIUS * 0.0625;
 export const HOP_LIFT = BODY_RADIUS * 0.3125;
+const BOUNDS_MARGIN = 2;
 const MAX_SCALE = 1.12;
 const DRAW_REACH = Math.max(
   Math.sqrt(ARM_EXTENT * ARM_EXTENT + BODY_RADIUS * BODY_RADIUS) * MAX_SCALE + HOP_LIFT,
@@ -36,13 +37,35 @@ export type PetPose = {
   facing: -1 | 1; eyeOpen: number; lookX: number; brightness: number;
 };
 
-export function poseBounds(p: PetPose): { x: number; y: number; width: number; height: number } {
-  const margin = 2;
-  const x = Math.max(0, Math.floor(Math.min(p.x - ARM_EXTENT * p.scaleX, p.x - SHADOW_HALF_WIDTH) - margin));
-  const y = Math.max(0, Math.floor(Math.min(p.y + BODY_RADIUS - (BODY_HEIGHT + LEG_LENGTH) * p.scaleY, p.groundY + SHADOW_OFFSET) - margin));
-  const right = Math.min(SIZE, Math.ceil(Math.max(p.x + ARM_EXTENT * p.scaleX, p.x + SHADOW_HALF_WIDTH) + margin));
-  const bottom = Math.min(SIZE, Math.ceil(Math.max(p.y + BODY_RADIUS, p.groundY + SHADOW_OFFSET + SHADOW_HEIGHT) + margin));
-  return { x, y, width: right - x, height: bottom - y };
+export type Bounds = { x: number; y: number; width: number; height: number };
+export type PoseRect = Bounds & { part: "shadow" | "body" | "eyes" };
+
+export function poseRects(p: PetPose): PoseRect[] {
+  const sx = p.scaleX, sy = p.scaleY, lift = p.groundY - p.y;
+  const left = p.x - ARM_EXTENT * sx;
+  const top = p.y + BODY_RADIUS - (BODY_HEIGHT + LEG_LENGTH) * sy;
+  const eyeHeight = Math.max(3, 26 * p.eyeOpen) * sy;
+  const eyeShift = p.lookX + p.facing * 2, eyeTop = top + 38 * sy - eyeHeight / 2;
+  return [
+    { part: "shadow", x: p.x - SHADOW_HALF_WIDTH + lift / 2, y: p.groundY + SHADOW_OFFSET, width: 2 * SHADOW_HALF_WIDTH - lift, height: SHADOW_HEIGHT },
+    { part: "body", x: p.x - BODY_HALF_WIDTH * sx, y: top, width: 2 * BODY_HALF_WIDTH * sx, height: BODY_HEIGHT * sy },
+    { part: "body", x: left, y: top + ARM_TOP * sy, width: (ARM_EXTENT - BODY_HALF_WIDTH + 1) * sx, height: ARM_HEIGHT * sy },
+    { part: "body", x: p.x + (BODY_HALF_WIDTH - 1) * sx, y: top + ARM_TOP * sy, width: (ARM_EXTENT - BODY_HALF_WIDTH + 1) * sx, height: ARM_HEIGHT * sy },
+    ...[24, 40, 80, 96].map(x => ({ part: "body" as const, x: left + x * sx, y: top + BODY_HEIGHT * sy, width: 8 * sx, height: LEG_LENGTH * sy })),
+    ...[32, 88].map(x => ({ part: "eyes" as const, x: left + (x + eyeShift) * sx, y: eyeTop, width: 8 * sx, height: eyeHeight })),
+  ];
+}
+
+export function poseBounds(p: PetPose): Bounds {
+  const rects = poseRects(p);
+  const left = Math.min(...rects.map(r => r.x));
+  const top = Math.min(...rects.map(r => r.y));
+  const right = Math.max(...rects.map(r => r.x + r.width));
+  const bottom = Math.max(...rects.map(r => r.y + r.height));
+  const clamp = (value: number) => Math.max(0, Math.min(SIZE, value));
+  const x = clamp(Math.floor(left - BOUNDS_MARGIN));
+  const y = clamp(Math.floor(top - BOUNDS_MARGIN));
+  return { x, y, width: clamp(Math.ceil(right + BOUNDS_MARGIN)) - x, height: clamp(Math.ceil(bottom + BOUNDS_MARGIN)) - y };
 }
 
 function random(state: PetState): number {

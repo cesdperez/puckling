@@ -1,38 +1,64 @@
+import { drawFrame } from "../render";
 import { describe, expect, test } from "bun:test";
-import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, poseBounds, step } from "./pet";
+import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, poseBounds, poseRects, step } from "./pet";
 
 describe("pet", () => {
   test("pose bounds contain every painted rectangle", () => {
     let state = createPet(7);
     const modes = new Set<string>();
+    let worstOverflow = -Infinity;
     for (let i = 0; i < 6000; i++) {
       const tap = i % 300 === 0 ? { x: state.x, y: state.y } :
         i % 300 === 150 ? { x: (i * 17) % SIZE, y: (i * 31) % SIZE } : undefined;
       state = step(state, { tap }, 1 / 30);
       modes.add(state.mode);
       const p = pose(state), bounds = poseBounds(p);
-      const sx = p.scaleX, sy = p.scaleY, left = p.x - ARM_EXTENT * sx;
-      const top = p.y + BODY_RADIUS - (BODY_HEIGHT + LEG_LENGTH) * sy;
-      const lift = p.groundY - p.y, eyeHeight = Math.max(3, 26 * p.eyeOpen) * sy;
-      const eyeShift = p.lookX + p.facing * 2, eyeTop = top + 38 * sy - eyeHeight / 2;
-      const rects = [
-        [p.x - SHADOW_HALF_WIDTH + lift / 2, p.groundY + SHADOW_OFFSET, 2 * SHADOW_HALF_WIDTH - lift, SHADOW_HEIGHT],
-        [p.x - BODY_HALF_WIDTH * sx, top, 2 * BODY_HALF_WIDTH * sx, BODY_HEIGHT * sy],
-        [left, top + ARM_TOP * sy, (ARM_EXTENT - BODY_HALF_WIDTH + 1) * sx, ARM_HEIGHT * sy],
-        [p.x + (BODY_HALF_WIDTH - 1) * sx, top + ARM_TOP * sy, (ARM_EXTENT - BODY_HALF_WIDTH + 1) * sx, ARM_HEIGHT * sy],
-        ...[24, 40, 80, 96].map(x => [left + x * sx, top + BODY_HEIGHT * sy, 8 * sx, LEG_LENGTH * sy]),
-        ...[32, 88].map(x => [left + (x + eyeShift) * sx, eyeTop, 8 * sx, eyeHeight]),
-      ];
-      for (const [x, y, width, height] of rects) {
-        expect(x).toBeGreaterThanOrEqual(bounds.x);
-        expect(y).toBeGreaterThanOrEqual(bounds.y);
-        expect(x + width).toBeLessThanOrEqual(bounds.x + bounds.width);
-        expect(y + height).toBeLessThanOrEqual(bounds.y + bounds.height);
+      for (const rect of poseRects(p)) {
+        worstOverflow = Math.max(worstOverflow, bounds.x - rect.x, bounds.y - rect.y,
+          rect.x + rect.width - bounds.x - bounds.width, rect.y + rect.height - bounds.y - bounds.height);
       }
       expect(bounds.width * bounds.height).toBeLessThan(SIZE * SIZE / 4);
     }
+    expect(worstOverflow).toBeLessThanOrEqual(0);
     expect(modes.has("flinch")).toBe(true);
     expect(modes.has("hop")).toBe(true);
+  });
+
+  test("bounds clamp at a canvas corner", () => {
+    const p = { x: 10, y: 10, groundY: 10, scaleX: 1, scaleY: 1, facing: 1 as const, eyeOpen: 1, lookX: 0, brightness: 1 };
+    const bounds = poseBounds(p);
+    expect(bounds.x).toBe(0);
+    expect(bounds.y).toBe(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(SIZE);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(SIZE);
+  });
+
+  test("clears each frame on its own canvas", () => {
+    const calls: number[][] = [];
+    const ctx = { fillStyle: "", fillRect: (x: number, y: number, width: number, height: number) => calls.push([x, y, width, height]) };
+    const other = { ...ctx, fillRect: ctx.fillRect };
+    let state = createPet(7);
+    for (let i = 0; i < 100; i++) {
+      state = step(state, i === 20 ? { tap: { x: SIZE, y: SIZE } } : {}, 1 / 30);
+      const p = pose(state);
+      calls.length = 0;
+      drawFrame(ctx as Parameters<typeof drawFrame>[0], p);
+      const [clear, ...paint] = calls;
+      if (i === 0) expect(clear).toEqual([0, 0, SIZE, SIZE]);
+      expect(paint).toEqual(poseRects(p).map(({ x, y, width, height }) => [x, y, width, height]));
+      for (const [x, y, width, height] of paint) {
+        expect(x).toBeGreaterThanOrEqual(clear[0]);
+        expect(y).toBeGreaterThanOrEqual(clear[1]);
+        expect(x + width).toBeLessThanOrEqual(clear[0] + clear[2]);
+        expect(y + height).toBeLessThanOrEqual(clear[1] + clear[3]);
+      }
+    }
+    calls.length = 0;
+    drawFrame(other as Parameters<typeof drawFrame>[0], pose(state));
+    expect(calls[0]).toEqual([0, 0, SIZE, SIZE]);
+    calls.length = 0;
+    drawFrame(ctx as Parameters<typeof drawFrame>[0], { ...pose(state), brightness: 0.3 });
+    expect(calls[0]).toEqual([0, 0, SIZE, SIZE]);
   });
 
   test("is deterministic and does not mutate its input", () => {
