@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "sim": "gea simulate --renderer dom --no-open --width 466 --height 466",
+    "sim": "node scripts/sim.mjs",
     "test": "bun test src/pet",
     "check": "tsc --noEmit",
     "build:firmware": "gea build --board puck",

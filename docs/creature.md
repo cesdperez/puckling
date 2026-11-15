@@ -4,12 +4,12 @@ Puckling is one small orange creature on a round screen. Today it is a toy that 
 
 ## Now
 
-- Drawn procedurally from rectangles on a single canvas, sized by `src/pet/pet.ts`. No sprites, no assets.
+- Drawn procedurally from rectangles on a single canvas by `src/render.ts`. `src/pet/pet.ts` owns its geometry and behaviour. No sprites, no assets.
 - Idle: blinks every few seconds, looks left and right, drifts a little, squashes and stretches gently.
 - Tap the body: it flinches, then hops, then calms.
 - Tap elsewhere on screen: it walks to that point, turns to face the way it goes, then looks around.
 - It never leaves the inscribed circle of the round panel.
-- After 60 seconds without a tap the display dims to 30 percent and the pet slows down. A tap restores brightness. This rests the AMOLED, which burns in under static light.
+- After 60 seconds without a tap the drawing fades to 30 percent brightness while the pet keeps wandering. A tap restores brightness. `src/render.ts` scales the drawing colours because the DOM sim ignores `Display.setBrightness`. This rests the AMOLED, which burns in under static light.
 - Silent. No sound, no network, no state outside the device.
 
 The behaviour is deterministic from a seed, so `bun test src/pet` can replay it and assert it, and the same code runs in the sim and on the device.

@@ -4,7 +4,7 @@ A small creature that lives on the round screen of a [Waveshare ESP32-S3-Touch-A
 
 It is a blocky orange pet drawn procedurally on one 466x466 canvas, no sprites. It idles, looks around, wanders, blinks, squashes and stretches, and stays inside the inscribed circle of the round panel. Tap it and it flinches, then hops. Tap somewhere else and it walks there.
 
-After 60 seconds without a tap the display dims to 30 percent and the pet keeps drifting slowly, which rests the AMOLED. A tap restores brightness.
+The pet keeps wandering as the drawing dims after inactivity. A tap restores brightness. See [creature behaviour](docs/creature.md).
 
 The app is built with [GeaStack](https://github.com/geastack/geastack). The same TypeScript runs in the browser sim, on the device through GeaStack's C++ compiler, and in `bun test`.
 
@@ -12,12 +12,12 @@ The app is built with [GeaStack](https://github.com/geastack/geastack). The same
 
 ```sh
 npm install
-npm run sim          # browser DOM emulator at http://localhost:5181/
+npm run sim          # browser DOM emulator at http://127.0.0.1:5181/
 npm test             # bun test src/pet
 npm run check        # tsc --noEmit
 ```
 
-The sim serves the app at http://localhost:5181/ and the emulator shell at http://localhost:5181/__gea_emulator. The mouse acts as touch.
+The sim serves the app at http://127.0.0.1:5181/ and the emulator shell at http://127.0.0.1:5181/__gea_emulator. The mouse acts as touch.
 
 `npm run sim:screenshot [file.png]` captures the running sim with Playwright (default `./sim.png`). The first run needs `npx playwright install chromium`.
 
@@ -25,14 +25,12 @@ The sim serves the app at http://localhost:5181/ and the emulator shell at http:
 
 ```sh
 npm run build:firmware
-npm run flash        # replaces the firmware on the puck
+npm run flash        # see firmware warning in docs/hardware.md
 npm run monitor
 npm run screenshot   # device screen to a PNG
 ```
 
-`npx gea doctor` checks the toolchain, and `npx gea devctl help` lists device control. GeaStack setup does not install ESP-IDF or CMake, so install ESP-IDF v6 yourself. The optional wasm sim renderer (`--renderer wasm`) needs emsdk.
-
-Flashing replaces the firmware the puck currently runs (Watt); Watt's web installer restores it. Board, chip, pin and toolchain facts live in [docs/hardware.md](docs/hardware.md).
+`npx gea doctor` checks the toolchain, and `npx gea devctl help` lists device control. See [docs/hardware.md](docs/hardware.md) for board and toolchain requirements. The optional wasm sim renderer (`--renderer wasm`) needs emsdk.
 
 Touch, brightness and frame rate are not yet checked on a physical puck. The firmware builds and the pet runs in the sim.
 
