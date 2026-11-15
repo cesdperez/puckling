@@ -1,6 +1,6 @@
 import type { GeaCanvasElement } from '@geastack/core'
 import { SIZE, type PetPose } from './pet/pet'
-import { poseRects, poseBounds, type Bounds } from './pet/shape'
+import { poseRects, rectsBounds, type Bounds, type PoseRect } from './pet/shape'
 
 type Context2D = ReturnType<GeaCanvasElement['getContext']>
 
@@ -30,20 +30,22 @@ export class FrameRenderer {
   private previous: Frame | undefined
 
   draw(ctx: Context2D, p: PetPose): void {
-    const bounds = poseBounds(p)
+    const rects = poseRects(p)
+    const bounds = rectsBounds(rects)
     clearDirty(ctx, bounds, p.brightness, this.previous)
     this.previous = { bounds, brightness: p.brightness }
-    paint(ctx, p)
+    paint(ctx, rects, p.brightness)
   }
 }
 
-function paint(ctx: Context2D, p: PetPose): void {
-  let previousColour = BACKGROUND
-  for (const rect of poseRects(p)) {
-    const nextColour = colour(rect.r, rect.g, rect.b, p.brightness)
-    if (nextColour !== previousColour) {
-      ctx.fillStyle = nextColour
-      previousColour = nextColour
+function paint(ctx: Context2D, rects: PoseRect[], brightness: number): void {
+  let r = -1, g = -1, b = -1
+  for (const rect of rects) {
+    if (rect.r !== r || rect.g !== g || rect.b !== b) {
+      ctx.fillStyle = colour(rect.r, rect.g, rect.b, brightness)
+      r = rect.r
+      g = rect.g
+      b = rect.b
     }
     ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
   }

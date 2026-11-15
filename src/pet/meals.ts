@@ -1,4 +1,4 @@
-import { createLife, feed, isNight, parseFood, parseLife, progress, type Life } from './life'
+import { age, createLife, feed, isNight, parseFood, parseLife, progress, type Life } from './life'
 import type { PetLife } from './pet'
 
 export function restore(saved: string): Life {
@@ -10,6 +10,26 @@ export function digest(life: Life, line: string): { life: Life; meal: boolean; e
   if (!food) return { life, meal: false, evolved: false, ate: 0 }
   const result = feed(life, food)
   return { life: result.life, meal: result.ate > 0, evolved: result.evolved, ate: result.ate }
+}
+
+export type Feeding = { life: Life; sincePoll: number; sinceSave: number }
+
+export function tick(feeding: Feeding, dt: number, readLine: () => string): { feeding: Feeding; meal: boolean; evolved: boolean; ate: number; save: boolean } {
+  let life = age(feeding.life, dt)
+  let sincePoll = feeding.sincePoll + dt
+  let sinceSave = feeding.sinceSave + dt
+  let meal = false, evolved = false, ate = 0
+  if (sincePoll >= 2) {
+    sincePoll = 0
+    const result = digest(life, readLine())
+    life = result.life
+    meal = result.meal
+    evolved = result.evolved
+    ate = result.ate
+  }
+  const save = meal || evolved || sinceSave >= 600
+  if (save) sinceSave = 0
+  return { feeding: { life, sincePoll, sinceSave }, meal, evolved, ate, save }
 }
 
 export function petLife(life: Life, epochMs: number): PetLife {

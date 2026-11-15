@@ -1,8 +1,34 @@
 import { describe, expect, test } from 'bun:test'
 import { createLife, serializeLife } from './life'
-import { bytesToText, digest, petLife, restore } from './meals'
+import { bytesToText, digest, petLife, restore, tick } from './meals'
 
 describe('meal glue', () => {
+  test('ticks polling and saving independently', () => {
+    let reads = 0
+    const read = () => { reads++; return '1 100 100 0 0 0 0 0 1' }
+    const initial = { life: createLife(), sincePoll: 0, sinceSave: 0 }
+    const first = tick(initial, 1, read)
+    expect(reads).toBe(0)
+    expect(first.save).toBe(false)
+    const second = tick(first.feeding, 1, read)
+    expect(reads).toBe(1)
+    expect(second.meal).toBe(true)
+    expect(second.save).toBe(true)
+    expect(initial.life.seen).toBe(false)
+    const third = tick(second.feeding, 2, read)
+    expect(third.save).toBe(false)
+    const periodic = tick(third.feeding, 598, read)
+    expect(periodic.save).toBe(true)
+    expect(periodic.feeding.sinceSave).toBe(0)
+  })
+  test('saves evolution without a new meal', () => {
+    const read = () => '1 600000 600000 0 0 0 0 0 1'
+    const first = tick({ life: createLife(), sincePoll: 0, sinceSave: 0 }, 2, read)
+    const second = tick(first.feeding, 2, read)
+    expect(second.evolved).toBe(true)
+    expect(second.ate).toBe(0)
+    expect(second.save).toBe(true)
+  })
   test('restores valid life and falls back for garbage', () => {
     expect(restore('garbage')).toEqual(createLife())
     const life = digest(createLife(), '1 90000 80000 5000 5000 0 0 60 1').life

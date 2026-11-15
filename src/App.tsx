@@ -1,7 +1,7 @@
 import { Clock, Component, readCacheFile, type GeaCanvasElement } from '@geastack/core'
 import { createPet, step, pose, SIZE } from './pet/pet'
-import { age, serializeLife } from './pet/life'
-import { bytesToText, digest, petLife, restore } from './pet/meals'
+import { serializeLife } from './pet/life'
+import { bytesToText, petLife, restore, tick } from './pet/meals'
 import { FrameRenderer } from './render'
 
 const FRAME_MS = 1000 / 30
@@ -26,9 +26,8 @@ export class App extends Component<GeaCanvasElement> {
 
   onAfterRender() {
     if (!this.el) return
-    let life = restore(localStorage.getItem('life') || '')
-    let sincePoll = 0
-    let sinceSave = 0
+    let feeding = { life: restore(localStorage.getItem('life') || ''), sincePoll: 0, sinceSave: 0 }
+    const life = feeding.life
     console.log('puckling: life ' + life.stage + ' ' + life.branch + ' lifetime=' + life.lifetime + ' fullness=' + life.fullness)
     const ctx = this.el.getContext('2d')
     const renderer = new FrameRenderer()
@@ -37,29 +36,11 @@ export class App extends Component<GeaCanvasElement> {
       if (time - this.lastFrame >= FRAME_MS - FRAME_TOLERANCE_MS || this.lastFrame === 0) {
         const dt = this.lastFrame === 0 ? 0 : (time - this.lastFrame) / 1000
         this.lastFrame = time
-        life = age(life, dt)
-        sincePoll += dt
-        sinceSave += dt
-        let meal = false
-        let evolved = false
-        if (sincePoll >= 2) {
-          sincePoll = 0
-          const line = localStorage.getItem('food') || bytesToText(readCacheFile('/sim/food.txt'))
-          const result = digest(life, line)
-          life = result.life
-          meal = result.meal
-          evolved = result.evolved
-          if (result.ate > 0 || evolved) {
-            console.log('puckling: ate ' + result.ate + ' kcal, ' + life.stage + ' ' + life.branch + ' lifetime=' + life.lifetime)
-            localStorage.setItem('life', serializeLife(life))
-            sinceSave = 0
-          }
-        }
-        if (sinceSave >= 600) {
-          localStorage.setItem('life', serializeLife(life))
-          sinceSave = 0
-        }
-        this.pet = step(this.pet, { tap: this.tap, life: petLife(life, wallTime()), meal, evolved }, dt)
+        const result = tick(feeding, dt, () => localStorage.getItem('food') || bytesToText(readCacheFile('/sim/food.txt')))
+        feeding = result.feeding
+        if (result.ate > 0 || result.evolved) console.log('puckling: ate ' + result.ate + ' kcal, ' + feeding.life.stage + ' ' + feeding.life.branch + ' lifetime=' + feeding.life.lifetime)
+        if (result.save) localStorage.setItem('life', serializeLife(feeding.life))
+        this.pet = step(this.pet, { tap: this.tap, life: petLife(feeding.life, wallTime()), meal: result.meal, evolved: result.evolved }, dt)
         this.tap = undefined
         const p = pose(this.pet)
         renderer.draw(ctx, p)

@@ -152,7 +152,9 @@ export function poseRects(p: PetPose): PoseRect[] {
   return rects;
 }
 export function poseBounds(p: PetPose): Bounds {
-  const rects = poseRects(p);
+  return rectsBounds(poseRects(p));
+}
+export function rectsBounds(rects: PoseRect[]): Bounds {
   let left = SIZE, top = SIZE, right = 0, bottom = 0;
   for (let i = 0; i < rects.length; i++) { const r = rects[i]; left = Math.min(left, r.x); top = Math.min(top, r.y); right = Math.max(right, r.x + r.width); bottom = Math.max(bottom, r.y + r.height); }
   left = Math.max(0, Math.floor(left - 2)); top = Math.max(0, Math.floor(top - 2)); right = Math.min(SIZE, Math.ceil(right + 2)); bottom = Math.min(SIZE, Math.ceil(bottom + 2));
