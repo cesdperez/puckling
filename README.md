@@ -12,12 +12,12 @@ The app is built with [GeaStack](https://geastack.com). The same TypeScript runs
 
 ```sh
 npm install
-npm run sim          # browser DOM emulator at http://127.0.0.1:5181/
+npm run sim          # browser sim, mouse acts as touch
 npm test             # bun test src/pet
 npm run check        # tsc --noEmit
 ```
 
-The sim serves the app at http://127.0.0.1:5181/ and the emulator shell at http://127.0.0.1:5181/__gea_emulator. The mouse acts as touch.
+The emulator shell is at http://127.0.0.1:5181/__gea_emulator.
 
 `npm run sim:screenshot [file.png]` captures the running sim with Playwright (default `./sim.png`). The first run needs `npx playwright install chromium`.
 
@@ -36,13 +36,11 @@ Touch, brightness and frame rate are not yet checked on a physical puck. The fir
 
 ## Layout
 
-- `src/pet/` is pure TypeScript with no GeaStack imports: `createPet`, `step(state, input, dt)`, `pose(state)`. Behaviour lives here so it stays testable.
-- `src/render.ts` draws a pose on the canvas. `src/App.tsx` runs the frame loop and feeds taps.
-- `scripts/sim-screenshot.mjs` captures the browser sim.
+`src/pet/` holds the behaviour as pure TypeScript, `src/render.ts` draws it, and `src/App.tsx` runs the loop. See [CLAUDE.md](CLAUDE.md) for where changes go.
 
 ## Roadmap
 
-Not built yet. A Mac daemon feeding the pet from Claude Code token usage, Orca session state driving its behaviour, transport over USB, Wi-Fi or BLE, sound under the [calm rules](docs/creature.md), growth stages and evolution, and IMU input such as tilt, spin and face-down mute.
+Food from Claude Code tokens, Orca session moods, sound, growth and IMU input are planned. See [docs/creature.md](docs/creature.md).
 
 ## License
 

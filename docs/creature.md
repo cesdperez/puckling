@@ -65,5 +65,3 @@ Orca session state drives what the creature does.
 Beyond tap: face down to mute, pick up to wake, tap a poop to clean it, long press for a menu.
 
 Everything past the creature needs more screens, because a round 466x466 display holds one thought: stats, one baby per live agent, usage limits, settings. A bezel wheel drag turns between them, and the creature stays visible on each so its state is never hidden. Menus on long press act on the selected agent.
-
-Not built: transport to the Mac over USB, Wi-Fi or BLE, sound with the calm rules, growth and evolution, IMU input such as tilt, spin and face-down mute.
