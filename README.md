@@ -6,7 +6,7 @@ It is a blocky orange pet drawn procedurally on one 466x466 canvas, no sprites. 
 
 The pet keeps wandering as the drawing dims after inactivity. A tap restores brightness. See [creature behaviour](docs/creature.md).
 
-The app is built with [GeaStack](https://github.com/geastack/geastack). The same TypeScript runs in the browser sim, on the device through GeaStack's C++ compiler, and in `bun test`.
+The app is built with [GeaStack](https://geastack.com). The same TypeScript runs in the browser sim, on the device through GeaStack's C++ compiler, and in `bun test`.
 
 ## Run
 
