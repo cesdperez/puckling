@@ -14,6 +14,7 @@
     "screenshot": "gea screenshot --board puck",
     "sim:screenshot": "node scripts/sim-screenshot.mjs",
     "feed": "bun scripts/feeder/main.ts",
+    "feed:ble": "bun scripts/feeder/main.ts --watch 5 --ble",
     "feed:serve": "bun scripts/feeder/main.ts --watch 5 --serve 7878",
     "feed:pair": "bun scripts/feeder/main.ts --pair --serve 7878",
     "feed:report": "bun scripts/feeder/main.ts --report --days 7"

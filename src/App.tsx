@@ -4,6 +4,7 @@ import { serializeLife, STAGES } from './pet/life'
 import { bytesToText, petLife, restore, tick } from './pet/meals'
 import { FrameRenderer } from './render'
 import { FeedClient } from './feed'
+import { Link } from './link'
 import { splitFeed, type Tokens } from './stats/tokens'
 import { evoName, parseEvo, serializeEvo, updateEvo } from './stats/evo'
 import { classify, createPager, stepPager, type Gesture, type Point } from './ui/pager'
@@ -38,6 +39,8 @@ export class App extends Component<GeaCanvasElement> {
   private tokens: Tokens | undefined
   private lastBody: string | undefined
   private feed = new FeedClient()
+  private link = new Link()
+  private get body(): string | undefined { return this.link.body ?? this.feed.body }
   private renderer = new FrameRenderer()
 
   private pointerDown(x: number, y: number): void { this.start = { x, y } }
@@ -69,8 +72,9 @@ export class App extends Component<GeaCanvasElement> {
   }
   private sample(now: number): void {
     this.feed.poll(now)
-    if (this.feed.body !== this.lastBody) {
-      this.lastBody = this.feed.body
+    this.link.poll(now)
+    if (this.body !== this.lastBody) {
+      this.lastBody = this.body
       if (this.lastBody !== undefined) this.tokens = splitFeed(this.lastBody).tokens
     }
     if (this.batteryAt === undefined || now - this.batteryAt >= BATTERY_EVERY_MS) {
@@ -82,7 +86,7 @@ export class App extends Component<GeaCanvasElement> {
     }
   }
   private advance(now: number, dt: number): number {
-    const result = tick(this.feeding, dt, () => this.feed.body !== undefined ? splitFeed(this.feed.body).food : localStorage.getItem('food') || bytesToText(readCacheFile('/sim/food.txt')))
+    const result = tick(this.feeding, dt, () => this.body !== undefined ? splitFeed(this.body).food : localStorage.getItem('food') || bytesToText(readCacheFile('/sim/food.txt')))
     this.feeding = result.feeding
     if (result.save) localStorage.setItem('life', serializeLife(this.feeding.life))
     const nextEvo = updateEvo(this.evo, STAGES.indexOf(this.feeding.life.stage), this.tokens, Math.random)
@@ -100,7 +104,7 @@ export class App extends Component<GeaCanvasElement> {
   }
   private renderFrame(ctx: ReturnType<GeaCanvasElement['getContext']>, now: number, previousPage: number): void {
     if (!this.evo) return
-    const data: ScreenData = { life: this.feeding.life, evo: this.evo, tokens: this.tokens, level: this.level, charging: this.charging, wifi: this.wifi, feedAge: this.feed.body === undefined ? -1 : Math.max(0, Math.floor((now - this.feed.arrived) / 1000)), url: this.feed.url }
+    const data: ScreenData = { life: this.feeding.life, evo: this.evo, tokens: this.tokens, level: this.level, charging: this.charging, wifi: this.wifi, feedAge: this.body === undefined ? -1 : Math.max(0, Math.floor((now - (this.link.body !== undefined ? this.link.arrived : this.feed.arrived)) / 1000)), url: this.feed.url }
     if (this.pager.page === 0) {
       if (previousPage !== 0) this.renderer.reset()
       const p = pose(this.pet)

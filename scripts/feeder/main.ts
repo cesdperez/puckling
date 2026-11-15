@@ -1,3 +1,5 @@
+import { spawn, execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
 import { files, readClaude, claudeDir } from "./claude";
 import { readCodex, codexDir } from "./codex";
@@ -10,7 +12,7 @@ import {
   type State,
 } from "./state";
 import { weigh } from "./weigh";
-import { deliver, formatFood } from "./deliver";
+import { deliver, formatFood, formatFeed } from "./deliver";
 import { addUsage, displayModel, localDay, tokenTotal } from "./tokens";
 import { pair, serve } from "./serve";
 function newMeal(meal: Meal, since: number, seen: Record<string, number>): boolean {
@@ -94,7 +96,7 @@ async function report(days: number) {
 export async function runOnce(args: string[], backfill?: string) {
   const now = Date.now();
   let state = loadState();
-  const first = !state;
+  const first = !state || (state.watermark === 0 && state.since === 0 && Object.keys(state.seen).length === 0);
   state ||= emptyState();
   if (first) {
     state.since = backfill === undefined ? now : now - Number(backfill) * 86400000;
@@ -107,7 +109,7 @@ export async function runOnce(args: string[], backfill?: string) {
     `claude ${eaten.claude.toFixed(2)} codex ${eaten.codex.toFixed(2)} opencode ${eaten.opencode.toFixed(2)} | ${line}`,
   );
   if (
-    (!args.includes("--serve") || args.includes("--sim")) && deliver(line, state, {
+    ((!args.includes("--serve") && !args.includes("--ble")) || args.includes("--sim")) && deliver(line, state, {
       sim: args.includes("--sim"),
       dryRun: args.includes("--dry-run"),
       port: value(args, "--port"),
@@ -132,8 +134,11 @@ export function parseArgs(args: string[]) {
   const serveArg = value(args, "--serve");
   const port = serveArg === undefined ? undefined : Number(serveArg);
   const pairing = args.includes("--pair");
+  const ble = args.includes("--ble");
   if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) throw new Error("Invalid serve port");
-  if (pairing && port === undefined) throw new Error("--pair requires --serve");
+  if (pairing && port === undefined && !ble) throw new Error("--pair requires --serve or --ble");
+  if (ble && port !== undefined) throw new Error("--ble cannot be combined with --serve");
+  if (ble && !watch && !pairing) throw new Error("--ble requires --watch");
   const devicePort = value(args, "--port");
   if (port !== undefined && !watch && !pairing) throw new Error("--serve requires --watch");
   if (
@@ -145,18 +150,43 @@ export function parseArgs(args: string[]) {
       (!Number.isFinite(Number(watch)) || Number(watch) <= 0))
   )
     throw new Error("Days and watch interval must be positive numbers");
-  return { days, backfill, watch, port, pairing, devicePort, report: args.includes("--report") };
+  return { days, backfill, watch, port, pairing, ble, devicePort, report: args.includes("--report") };
+}
+export function frameBle(key: string, body: string): string {
+  const blob = Buffer.from(`${key}\n${body}`, "utf8");
+  if (blob.length > 4096) throw new Error("BLE feed exceeds 4096 bytes");
+  return blob.toString("base64") + "\n";
+}
+function ensureBleKey(state: State): string {
+  return state.bleKey ||= randomBytes(8).toString("hex");
 }
 async function main() {
   const args = process.argv;
-  const { days, backfill, watch, port, pairing, devicePort, report: isReport } = parseArgs(args);
+  const { days, backfill, watch, port, pairing, ble, devicePort, report: isReport } = parseArgs(args);
   if (isReport) return report(days);
+  if (pairing && ble) {
+    const state = loadState() || emptyState();
+    const key = ensureBleKey(state);
+    saveState(state);
+    execFileSync("npx", ["gea", "devctl", "storage", "set", "feedkey", key, "--board", "puck", ...(devicePort ? ["--port", devicePort] : [])], { stdio: "inherit" });
+    return;
+  }
   if (pairing) return pair(port!, devicePort);
+  const helper = ble ? spawn("swift", ["scripts/feeder/ble.swift"], { stdio: ["pipe", "ignore", "inherit"] }) : undefined;
+  helper?.on("error", (error) => { console.error(error.message); process.exit(1); });
+  helper?.on("exit", () => { console.error("BLE helper exited"); process.exit(1); });
+  let lastBody: string | undefined;
   let latest: State | undefined;
   if (port !== undefined) serve(port, () => latest);
   do {
     try {
       latest = await runOnce(args, backfill);
+      if (helper) {
+        const key = ensureBleKey(latest);
+        saveState(latest);
+        const body = formatFeed(latest);
+        if (body !== lastBody) { helper.stdin.write(frameBle(key, body)); lastBody = body; }
+      }
     } catch (error) {
       if (!watch) throw error;
       console.error(String(error instanceof Error ? error.message : error).split("\n")[0]);

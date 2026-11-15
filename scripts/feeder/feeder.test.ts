@@ -385,3 +385,12 @@ test("serve skips USB delivery and sim still writes food", async () => {
     }
   }
 });
+
+test('BLE arguments and framing', async () => {
+  const { parseArgs, frameBle } = await import('./main')
+  expect(() => parseArgs(['--ble'])).toThrow()
+  expect(parseArgs(['--ble', '--pair']).pairing).toBe(true)
+  expect(() => parseArgs(['--ble', '--watch', '5', '--serve', '7878'])).toThrow()
+  expect(Buffer.from(frameBle('0123456789abcdef', 'food\n'), 'base64').toString()).toBe('0123456789abcdef\nfood\n')
+  expect(() => frameBle('0123456789abcdef', 'x'.repeat(4096))).toThrow()
+})

@@ -33,6 +33,7 @@ export type State = {
     time: number;
   }[];
   lastSent?: string;
+  bleKey?: string;
 };
 export const statePath = () =>
   process.env.PUCKLING_FEEDER_STATE ||
