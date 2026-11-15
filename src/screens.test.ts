@@ -6,7 +6,7 @@ const data: ScreenData = {
   life: createLife(),
   evo: { stage: 0, adjective: 0, nerd: 0, generation: 1, snapshot: [] },
   tokens: { generation: 1, total: 100, input: 50, output: 50, cacheRead: 0, cacheWrite: 0, today: 100, models: [] },
-  level: 100, charging: false, wifi: 'wifi', feedAge: 1, url: 'feed',
+  level: 100, charging: false, feedAge: 1,
 }
 
 test('screen keys reflect displayed scalar changes', () => {

@@ -1,9 +1,8 @@
-import { Battery, Clock, Component, WiFi, readCacheFile, type GeaCanvasElement } from '@geastack/core'
+import { Battery, Clock, Component, readCacheFile, type GeaCanvasElement } from '@geastack/core'
 import { createPet, step, pose, SIZE } from './pet/pet'
 import { serializeLife, STAGES } from './pet/life'
 import { bytesToText, petLife, restore, tick } from './pet/meals'
 import { FrameRenderer } from './render'
-import { FeedClient } from './feed'
 import { Link } from './link'
 import { splitFeed, type Tokens } from './stats/tokens'
 import { evoName, parseEvo, serializeEvo, updateEvo } from './stats/evo'
@@ -19,10 +18,6 @@ function wallTime(): number {
     return Date.now()
   }
 }
-function wifiStatus(): string {
-  // These bindings are missing or partial in the browser sim.
-  try { return WiFi.connected() ? 'wifi ' + WiFi.rssi() + 'dBm' : 'wifi down' } catch { return 'wifi n/a' }
-}
 export class App extends Component<GeaCanvasElement> {
   private pet = createPet(12345)
   private start: Point | undefined
@@ -34,13 +29,13 @@ export class App extends Component<GeaCanvasElement> {
   private key = ''
   private level = 100
   private charging = false
-  private wifi = ''
   private batteryAt: number | undefined
   private tokens: Tokens | undefined
   private lastBody: string | undefined
-  private feed = new FeedClient()
+  private simBody: string | undefined
+  private simArrived = 0
   private link = new Link()
-  private get body(): string | undefined { return this.link.body ?? this.feed.body }
+  private get body(): string | undefined { return this.link.body ?? this.simBody }
   private renderer = new FrameRenderer()
 
   private pointerDown(x: number, y: number): void { this.start = { x, y } }
@@ -71,7 +66,6 @@ export class App extends Component<GeaCanvasElement> {
     requestAnimationFrame(frame)
   }
   private sample(now: number): void {
-    this.feed.poll(now)
     this.link.poll(now)
     if (this.body !== this.lastBody) {
       this.lastBody = this.body
@@ -82,11 +76,16 @@ export class App extends Component<GeaCanvasElement> {
       // These bindings are missing or partial in the browser sim.
       try { this.level = Battery.level() } catch {}
       try { this.charging = Battery.charging() } catch { this.charging = false }
-      this.wifi = wifiStatus()
     }
   }
   private advance(now: number, dt: number): number {
-    const result = tick(this.feeding, dt, () => this.body !== undefined ? splitFeed(this.body).food : localStorage.getItem('food') || bytesToText(readCacheFile('/sim/food.txt')))
+    const result = tick(this.feeding, dt, () => {
+      if (this.link.body === undefined) {
+        const body = bytesToText(readCacheFile('/sim/feed.txt')) || undefined
+        if (body !== this.simBody) { this.simBody = body; this.simArrived = now }
+      }
+      return this.body !== undefined ? splitFeed(this.body).food : localStorage.getItem('food') || ''
+    })
     this.feeding = result.feeding
     if (result.save) localStorage.setItem('life', serializeLife(this.feeding.life))
     const nextEvo = updateEvo(this.evo, STAGES.indexOf(this.feeding.life.stage), this.tokens, Math.random)
@@ -104,7 +103,7 @@ export class App extends Component<GeaCanvasElement> {
   }
   private renderFrame(ctx: ReturnType<GeaCanvasElement['getContext']>, now: number, previousPage: number): void {
     if (!this.evo) return
-    const data: ScreenData = { life: this.feeding.life, evo: this.evo, tokens: this.tokens, level: this.level, charging: this.charging, wifi: this.wifi, feedAge: this.body === undefined ? -1 : Math.max(0, Math.floor((now - (this.link.body !== undefined ? this.link.arrived : this.feed.arrived)) / 1000)), url: this.feed.url }
+    const data: ScreenData = { life: this.feeding.life, evo: this.evo, tokens: this.tokens, level: this.level, charging: this.charging, feedAge: this.body === undefined ? -1 : Math.max(0, Math.floor((now - (this.link.body !== undefined ? this.link.arrived : this.simArrived)) / 1000)) }
     if (this.pager.page === 0) {
       if (previousPage !== 0) this.renderer.reset()
       const p = pose(this.pet)

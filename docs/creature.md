@@ -23,7 +23,7 @@ kcal = weighted * model_factor / 1000
 
 `model_factor` makes a strong model richer food than a cheap one; the table is in `scripts/feeder/weigh.ts`. Dedupe is by message id, plus a byte offset per file and a watermark for the opencode database. Feeder state is `~/.local/state/puckling/feeder.json`.
 
-The creature re-reads its food every 2 seconds: the Wi-Fi body when there is one, otherwise the `food` key that USB delivery writes, otherwise `feed/food.txt` in the sim. The Wi-Fi client requests `/feed` every 5 seconds. The body starts with the food line, then the token totals:
+The creature re-reads food every 2 seconds. It uses the Bluetooth body, or the sim feed file, or the `food` key written over USB. The body starts with the food line, then the token totals:
 
 ```
 1 total claude codex opencode night parallel tzMinutes generation

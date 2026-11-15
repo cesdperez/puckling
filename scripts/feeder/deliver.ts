@@ -33,7 +33,7 @@ export function deliver(
   if (opts.sim) {
     const dir = process.env.PUCKLING_FEED_DIR || fileURLToPath(new URL("../../feed/", import.meta.url));
     mkdirSync(dir, { recursive: true });
-    writeFileSync(`${dir}/food.txt`, line);
+    writeFileSync(`${dir}/feed.txt`, formatFeed(state));
     return false;
   }
   if (line === state.lastSent) return false;

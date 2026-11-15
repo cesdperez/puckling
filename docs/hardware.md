@@ -11,7 +11,7 @@ Board: **Waveshare ESP32-S3-Touch-AMOLED-1.75C**.
 | IMU | QMI8658 6-axis | I2C |
 | Mics | dual digital mics via ES7210 ADC | I2S |
 | Speaker | ES8311 codec + amp | I2S |
-| Radio | Wi-Fi 2.4 GHz, BLE 5 | |
+| Radio | BLE 5 | |
 
 ## GeaStack target
 
@@ -31,8 +31,7 @@ The `puck` alias carries this puck's USB serial, so flash, monitor and screensho
 - `geatsc` cannot use the canvas context as a WeakMap key, since a native handle has no reference identity on the device; keep per-canvas state on an object the component owns.
 - `gea flash`, `gea monitor`, `gea screenshot` and `gea devctl` accept `--port <dev>`, although their help does not list it.
 - Right after a flash, `gea screenshot` returns `display-unavailable` and `gea devctl summary` times out until the app finishes booting. Wait a few seconds, or reboot the board.
-- NVS keys are at most 15 characters, and `localStorage` on the device is NVS. That is why the keys are `food`, `life`, `evo` and `feedurl`.
-- `fetchAsync`, `fetchReady`, `fetchResult` and `fetchRelease` are globals on the device. Importing them from `@geastack/core` fails the firmware build, although the sim accepts the import.
+- NVS keys are at most 15 characters, and `localStorage` on the device is NVS. That is why the keys are `food`, `life`, `evo` and `feedkey`.
 - `geatsc` fails on `JSON.stringify` of an optional value. Pass a defined value, or stringify it behind a guard.
 - `fillText` anchors the top-left of the text, and `textAlign` does nothing. Centre a string yourself with `measureText` and subtract half the width.
 - The browser sim's `Battery` has `level()` only, with no `charging()`, and no `measureTextInkCenter`. Calls to those sit in `try`/`catch`.

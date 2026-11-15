@@ -6,6 +6,5 @@ sim.png
 .DS_Store
 *.log
 
-feed/food.txt
+feed/feed.txt
 
-.env

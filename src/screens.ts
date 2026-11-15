@@ -6,7 +6,7 @@ import { formatPercent, formatTokens } from './ui/format'
 import { PAGES, showBattery } from './ui/pager'
 
 type Context = ReturnType<GeaCanvasElement['getContext']>
-export type ScreenData = { life: Life; evo: Evo; tokens: Tokens | undefined; level: number; charging: boolean; wifi: string; feedAge: number; url: string }
+export type ScreenData = { life: Life; evo: Evo; tokens: Tokens | undefined; level: number; charging: boolean; feedAge: number }
 const TEXT = '#e8e8e8', DIM = '#777777', TRACK = '#262626', ORANGE = '#d97757'
 
 function text(ctx: Context, value: string, x: number, y: number, size: number, color: string): void {
@@ -37,10 +37,10 @@ function dots(ctx: Context, page: number): void {
   for (let i = 0; i < PAGES; i++) { ctx.beginPath(); ctx.fillStyle = i === page ? ORANGE : TRACK; ctx.arc(203 + i * 20, 422, 4, 0, Math.PI * 2); ctx.fill() }
 }
 export function screenKey(page: number, d: ScreenData): string {
-  let key = page + '|' + d.level + '|' + d.charging + '|' + d.url
+  let key = page + '|' + d.level + '|' + d.charging
   if (d.tokens) key += '|' + d.tokens.generation + '|' + d.tokens.total + '|' + d.tokens.today + '|' + d.tokens.models.length + '|' + sinceEvoTotal(d.evo, d.tokens)
   if (page === 1) key += '|' + d.life.stage + '|' + d.life.branch + '|' + formatPercent(progress(d.life)) + '|' + evoName(d.evo)
-  if (page === 3) key += '|' + d.wifi + '|' + d.feedAge
+  if (page === 3) key += '|' + d.feedAge
   return key
 }
 export function drawScreen(ctx: Context, page: number, d: ScreenData): void {
@@ -48,7 +48,7 @@ export function drawScreen(ctx: Context, page: number, d: ScreenData): void {
   if (!d.tokens) {
     battery(ctx, d.level, d.charging, page !== 1); dots(ctx, page)
     text(ctx, 'no feed', 233, 215, 28, TEXT)
-    text(ctx, d.url, 233, 250, 14, DIM)
+    text(ctx, 'npm run feed:ble', 233, 250, 14, DIM)
     return
   }
   const t = d.tokens, total = sinceEvoTotal(d.evo, t)
@@ -88,8 +88,7 @@ export function drawScreen(ctx: Context, page: number, d: ScreenData): void {
     text(ctx, 'in ' + formatTokens(t.input) + '  out ' + formatTokens(t.output), 233, 190, 17, TEXT)
     text(ctx, 'cache r ' + formatTokens(t.cacheRead) + ' w ' + formatTokens(t.cacheWrite), 233, 228, 17, TEXT)
     text(ctx, 'bat ' + Math.round(d.level) + '%' + (d.charging ? ' chg' : ''), 233, 266, 18, TEXT)
-    text(ctx, d.wifi, 233, 304, 18, TEXT)
-    text(ctx, d.feedAge < 0 ? 'feed offline' : 'feed ' + d.feedAge + 's ago', 233, 342, 18, DIM)
+    text(ctx, d.feedAge < 0 ? 'link offline' : 'link ' + d.feedAge + 's ago', 233, 342, 18, DIM)
   }
   battery(ctx, d.level, d.charging, page !== 1); dots(ctx, page)
 }
