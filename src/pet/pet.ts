@@ -1,3 +1,6 @@
+import type { Stage, Branch } from "./life";
+import { formScale } from "./shape";
+
 export const SIZE = 466;
 export const CENTER = SIZE / 2;
 export const VISIBLE_RADIUS = 233;
@@ -34,6 +37,10 @@ export type PetState = {
 export type PetPose = {
   x: number; y: number; groundY: number; scaleX: number; scaleY: number;
   facing: -1 | 1; eyeOpen: number; lookX: number; brightness: number;
+  stage: Stage; branch: Branch; form: number; formScale: number; progress: number;
+  mouth: number; asleep: boolean; sleepTime: number;
+  pellet: { x: number; y: number; size: number } | undefined;
+  sparkle: number; time: number;
 };
 
 function random(state: PetState): number {
@@ -186,5 +193,8 @@ export function pose(state: PetState): PetPose {
     lookX: state.mode === "look" ? Math.sin(state.modeTime * 1.5) * 4 :
       state.mode === "walk" || state.mode === "wander" ? state.facing * 3 : 0,
     brightness: 1 - (1 - DIM_LEVEL) * dimming(state),
+    stage: "adult", branch: "ember", form: 1, formScale: formScale("adult"),
+    progress: 0, mouth: 0, asleep: false, sleepTime: 0, pellet: undefined,
+    sparkle: 0, time: state.time,
   };
 }
