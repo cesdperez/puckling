@@ -6,7 +6,7 @@
   "scripts": {
     "gallery": "bun scripts/gallery.ts",
     "sim": "node scripts/sim.mjs",
-    "test": "bun test src/pet src/render.test.ts scripts/feeder",
+    "test": "bun test src scripts/feeder",
     "check": "tsc --noEmit",
     "build:firmware": "gea build --board puck",
     "flash": "gea flash --board puck",
