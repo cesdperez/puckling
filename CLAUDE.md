@@ -1,9 +1,14 @@
 # puckling
 
-A GeaStack app: one orange pet on a round 466x466 canvas, running in the browser sim and on a Waveshare ESP32-S3-Touch-AMOLED-1.75C.
+A GeaStack app: one pet on a round 466x466 canvas, running in the browser sim and on a Waveshare ESP32-S3-Touch-AMOLED-1.75C.
 
-- `src/pet/pet.ts` is the whole creature: pure TypeScript, no GeaStack imports, deterministic from a seed. New behaviour goes there, with a case in `src/pet/pet.test.ts`, so it runs on the device and in `bun test`. `src/render.ts` only draws the pose, `src/App.tsx` only runs the loop and turns pointer events into taps.
-- Board, target and toolchain facts are in `docs/hardware.md`. Read it before touching `.gea/boards.json`, pins or display brightness.
+All of `src/pet/` is pure TypeScript with no GeaStack imports, so it runs on the device and in `bun test`.
+
+- Growth and the food format: `src/pet/life.ts`. Every form's rectangles: `src/pet/shape.ts`. Behaviour and pose: `src/pet/pet.ts`, deterministic from a seed. The glue that reads a food line and saves the life: `src/pet/meals.ts`.
+- Each of those modules has a test beside it. Add the case there with the change.
+- `src/render.ts` only draws the pose, clearing the dirty rectangle from `poseBounds`. `src/App.tsx` only runs the loop and turns pointer events into taps.
+- `scripts/feeder/` is the Mac side, also under `bun test`. It reads token counts, ids and timestamps from the transcripts. It never writes transcript text to its output or sends it anywhere, and nothing but the food line leaves the Mac. Keep it that way.
+- Board, target, toolchain, NVS and devctl traps are in `docs/hardware.md`. Read it before touching `.gea/boards.json`, pins, display brightness or storage keys.
+- Creature design, the growth numbers and the calm rules are in `docs/creature.md`. Read it before adding behaviour.
 - Flash only when the user asks: it replaces the firmware on the puck.
-- Visual proof comes from `npm run sim:screenshot`, which needs the sim already running.
-- Creature design, the calm sound rules and the long-term vision are in `docs/creature.md`. Read it before adding behaviour or sound.
+- Visual proof comes from `npm run sim:screenshot`, which needs the sim already running, or `npm run gallery` for every form at once.
