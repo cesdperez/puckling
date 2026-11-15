@@ -95,6 +95,7 @@ async function report(days: number) {
 export async function runOnce(args: string[], backfill?: string) {
   const now = Date.now();
   let state = loadState();
+  // Pairing saves only a key, so the first feed must still seed offsets and since.
   const first = !state || (state.watermark === 0 && state.since === 0 && Object.keys(state.seen).length === 0);
   state ||= emptyState();
   if (first) {
@@ -154,18 +155,21 @@ export function frameBle(key: string, body: string): string {
 function ensureBleKey(state: State): string {
   return state.bleKey ||= randomBytes(8).toString("hex");
 }
+export function shouldStartBle(args: string[]): boolean {
+  return args.includes("--ble") && !args.includes("--dry-run") && !args.includes("--sim");
+}
 async function main() {
   const args = process.argv;
   const { days, backfill, watch, pairing, ble, devicePort, report: isReport } = parseArgs(args);
   if (isReport) return report(days);
-  if (pairing && ble) {
+  if (pairing && ble && shouldStartBle(args)) {
     const state = loadState() || emptyState();
     const key = ensureBleKey(state);
     saveState(state);
     execFileSync("npx", ["gea", "devctl", "storage", "set", "feedkey", key, "--board", "puck", ...(devicePort ? ["--port", devicePort] : [])], { stdio: "inherit" });
     return;
   }
-  const helper = ble ? spawn("swift", ["scripts/feeder/ble.swift"], { stdio: ["pipe", "ignore", "inherit"] }) : undefined;
+  const helper = shouldStartBle(args) ? spawn("swift", ["scripts/feeder/ble.swift"], { stdio: ["pipe", "ignore", "inherit"] }) : undefined;
   helper?.on("error", (error) => { console.error(error.message); process.exit(1); });
   helper?.on("exit", () => { console.error("BLE helper exited"); process.exit(1); });
   let lastBody: string | undefined;

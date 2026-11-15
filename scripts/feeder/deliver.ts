@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { SIM_FEED_FILE } from "../../src/sim";
 import type { State } from "./state";
 import { addUsage, localDay, tokenTotal } from "./tokens";
 export function formatFood(state: State, date = new Date()) {
@@ -33,7 +34,7 @@ export function deliver(
   if (opts.sim) {
     const dir = process.env.PUCKLING_FEED_DIR || fileURLToPath(new URL("../../feed/", import.meta.url));
     mkdirSync(dir, { recursive: true });
-    writeFileSync(`${dir}/feed.txt`, formatFeed(state));
+    writeFileSync(`${dir}/${SIM_FEED_FILE}`, formatFeed(state));
     return false;
   }
   if (line === state.lastSent) return false;

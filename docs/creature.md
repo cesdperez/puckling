@@ -73,7 +73,7 @@ Swipe left or right to move between four pages. A dot row under the centre marks
 - 0 home: the creature, with a dim `LV <n> <name>` label across the bottom.
 - 1 evo: the level, the stage and branch, the evo name, and a progress ring around the bezel, with `next evo NN%` or `max lv` at the final form, and `+X tok since evo`.
 - 2 tokens per model: the top five models plus `other`, each with its lifetime total and the tokens gained since the last evolution.
-- 3 sys: total tokens, today, input and output, cache read and write, battery, Wi-Fi RSSI, and the age of the last feed.
+- 3 sys: total tokens, today, input and output, cache read and write, battery and the age of the last Bluetooth link.
 
 The stats pages return to home after 20 seconds without a touch, so static text does not burn into the AMOLED. A tap reaches the creature on home only.
 

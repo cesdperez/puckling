@@ -20,7 +20,7 @@ test('screen keys reflect displayed scalar changes', () => {
 
 test('centres bitmap fallback text and draws arcs with filled circles', () => {
   const labels: { value: string; x: number }[] = []
-  let circles = 0
+  const circles: number[][] = []
   const ctx = {
     font: '', fillStyle: '',
     measureText: () => 0,
@@ -28,14 +28,17 @@ test('centres bitmap fallback text and draws arcs with filled circles', () => {
     fillText: (value: string, x: number) => labels.push({ value, x }),
     fillRect: () => {},
     beginPath: () => {},
-    arc: () => { circles++ },
+    arc: (x: number, y: number, radius: number) => { circles.push([x, y, radius]) },
     fill: () => {},
   }
   drawScreen(ctx as never, 3, data)
   const label = labels.find(item => item.value === 'sum 100 tok')!
-  expect(label.x).toBe(233 - label.value.length * Math.round(27 / 2) / 2)
+  expect(label.x).toBe(156)
   expect(labels.every(item => /^[\x00-\x7f]*$/.test(item.value))).toBe(true)
-  expect(circles).toBeGreaterThan(50)
+  expect(circles.length).toBeGreaterThan(30)
+  expect(circles[0][0]).toBeCloseTo(137.487, 2)
+  expect(circles[0][1]).toBeCloseTo(28.176, 2)
+  expect(circles[0][2]).toBe(3)
 })
 
 test('centres text with browser metrics', () => {

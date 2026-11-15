@@ -36,7 +36,7 @@ export function petLife(life: Life, epochMs: number): PetLife {
   return { stage: life.stage, branch: life.branch, fullness: life.fullness, progress: progress(life), night: isNight(epochMs, life.last.tzMinutes) }
 }
 
-export function bytesToText(bytes: Uint8Array): string {
+export function bytesToText(bytes: number[] | Uint8Array): string {
   let text = ''
   for (let i = 0; i < bytes.length; i++) text += String.fromCharCode(bytes[i])
   return text

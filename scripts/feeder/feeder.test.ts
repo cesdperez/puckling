@@ -8,7 +8,7 @@ import { weigh, modelFactor } from "./weigh";
 import { readClaude } from "./claude";
 import { readCodex } from "./codex";
 import { readOpencode } from "./opencode";
-import { applyMeals, countReport, parseArgs, runOnce } from "./main";
+import { applyMeals, countReport, parseArgs, runOnce, shouldStartBle } from "./main";
 import { deliver, formatFood, formatFeed } from "./deliver";
 import { displayModel } from "./tokens";
 const dir = () => mkdtempSync(join(tmpdir(), "puckling-test-"));
@@ -282,13 +282,13 @@ test("subagents have distinct sessions and rewritten Claude files dedupe", async
   writeFileSync(c, JSON.stringify({ timestamp, type: "token_usage_record", payload: { response_id: "r", session_id: "parent", thread_id: "worker", usage: { input_tokens: 1 } } }) + "\n");
   expect((await readCodex(emptyState(), join(c, "..")))[0].session).toBe("worker");
 });
-test("delivery sim, dry run, and unchanged device line", () => {
+test("sim writes the full feed, dry run and unchanged device line do not deliver", () => {
   const d = dir(), state = emptyState(), previous = process.env.PUCKLING_FEED_DIR;
   process.env.PUCKLING_FEED_DIR = d;
   try {
-    expect(deliver("food", state, { dryRun: true, sim: true })).toBe(false);
+    expect(deliver("", state, { dryRun: true, sim: true })).toBe(false);
     expect(existsSync(join(d, "feed.txt"))).toBe(false);
-    expect(deliver("food", state, { sim: true })).toBe(false);
+    expect(deliver("", state, { sim: true })).toBe(false);
     expect(readFileSync(join(d, "feed.txt"), "utf8")).toBe(formatFeed(state));
     state.lastSent = "food";
     expect(deliver("food", state, {})).toBe(false);
@@ -341,3 +341,26 @@ test('BLE arguments and framing', async () => {
   expect(Buffer.from(frameBle('0123456789abcdef', 'food\n'), 'base64').toString()).toBe('0123456789abcdef\nfood\n')
   expect(() => frameBle('0123456789abcdef', 'x'.repeat(4096))).toThrow()
 })
+
+test("BLE watch and delivery guards", () => {
+  expect(parseArgs(["--ble", "--watch", "5"]).watch).toBe("5");
+  expect(() => parseArgs(["--ble", "--watch", "0"])).toThrow();
+  expect(parseArgs(["--sim", "--ble", "--watch", "5"]).ble).toBe(true);
+  expect(shouldStartBle(["--ble", "--watch", "5"])).toBe(true);
+  expect(shouldStartBle(["--ble", "--dry-run"])).toBe(false);
+  expect(shouldStartBle(["--ble", "--sim"])).toBe(false);
+});
+
+test("key-only state starts from now", async () => {
+  const d = dir(), path = join(d, "a.jsonl"), statePath = join(d, "state.json");
+  const line = JSON.stringify({ type: "assistant", timestamp: new Date().toISOString(), sessionId: "s", message: { id: "old", model: "opus", usage: { input_tokens: 1000 } } }) + "\n";
+  writeFileSync(path, line);
+  writeFileSync(statePath, JSON.stringify({ bleKey: "key" }));
+  const env = { ...process.env, PUCKLING_CLAUDE_DIR: d, PUCKLING_CODEX_DIR: join(d, "none"), PUCKLING_OPENCODE_DB: join(d, "none.db"), PUCKLING_FEEDER_STATE: statePath };
+  expect(Bun.spawnSync(["bun", "scripts/feeder/main.ts", "--dry-run"], { env }).exitCode).toBe(0);
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  expect(state.bleKey).toBe("key");
+  expect(state.since).toBeGreaterThan(0);
+  expect(state.offsets[path]).toBe(Buffer.byteLength(line));
+  expect(state.counters.total).toBe(0);
+});

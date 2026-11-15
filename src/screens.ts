@@ -9,17 +9,21 @@ type Context = ReturnType<GeaCanvasElement['getContext']>
 export type ScreenData = { life: Life; evo: Evo; tokens: Tokens | undefined; level: number; charging: boolean; feedAge: number }
 const TEXT = '#e8e8e8', DIM = '#777777', TRACK = '#262626', ORANGE = '#d97757'
 
+function measure(ctx: Context, value: string, size: number): { width: number; center: number } {
+  const metric = ctx.measureText(value)
+  let width = typeof metric === 'number' ? metric : (metric as TextMetrics).width
+  if (width === 0) width = value.length * Math.round(size / 2)
+  const inkCenter = ctx.measureTextInkCenter ? ctx.measureTextInkCenter(value) : 0
+  return { width, center: inkCenter || size / 2 }
+}
 function text(ctx: Context, value: string, x: number, y: number, size: number, color: string): void {
   ctx.font = size + 'px monospace'
   ctx.fillStyle = color
-  let width = ctx.measureText(value), center = size / 2
-  try { center = ctx.measureTextInkCenter(value) } catch { width = (ctx.measureText(value) as any).width }
-  if (width === 0) width = value.length * Math.round(size / 2)
-  if (center === 0) center = size / 2
+  const { width, center } = measure(ctx, value, size)
   ctx.fillText(value, x - width / 2, y - center)
 }
 function arc(ctx: Context, radius: number, width: number, start: number, end: number, color: string): void {
-  const count = Math.max(1, Math.ceil((end - start) * radius / (width / 2)))
+  const count = Math.max(1, Math.ceil((end - start) * radius / width))
   ctx.fillStyle = color
   for (let i = 0; i <= count; i++) {
     const angle = start + (end - start) * i / count

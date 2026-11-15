@@ -62,7 +62,8 @@ export function emptyState(): State {
 }
 export function loadState(path = statePath()) {
   if (!existsSync(path)) return null;
-  const state = JSON.parse(readFileSync(path, "utf8")) as State;
+  let state = JSON.parse(readFileSync(path, "utf8")) as State;
+  state = Object.assign(emptyState(), state);
   state.tokens ??= {};
   state.days ??= {};
   state.generation ??= Math.floor(Date.now() / 1000);
@@ -70,8 +71,8 @@ export function loadState(path = statePath()) {
   return state;
 }
 export function saveState(state: State, path = statePath()) {
-  mkdirSync(dirname(path), { recursive: true });
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(state));
+  writeFileSync(tmp, JSON.stringify(state), { mode: 0o600 });
   renameSync(tmp, path);
 }
