@@ -32,11 +32,18 @@ export class FrameRenderer {
   reset(): void { this.previous = undefined }
 
   draw(ctx: Context2D, p: PetPose): void {
-    const rects = poseRects(p)
-    const bounds = rectsBounds(rects)
+    this.clear(ctx, p)
+    this.paint(ctx, p)
+  }
+
+  clear(ctx: Context2D, p: PetPose): void {
+    const bounds = rectsBounds(poseRects(p))
     clearDirty(ctx, bounds, p.brightness, this.previous)
     this.previous = { bounds, brightness: p.brightness }
-    paint(ctx, rects, p.brightness)
+  }
+
+  paint(ctx: Context2D, p: PetPose): void {
+    paint(ctx, poseRects(p), p.brightness)
   }
 }
 

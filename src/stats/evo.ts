@@ -1,5 +1,5 @@
 import { STAGES } from '../pet/life'
-import type { ModelTokens, Tokens } from './tokens'
+import { integer, type ModelTokens, type Tokens } from './tokens'
 
 export const ADJECTIVES = ['admiring', 'adoring', 'affectionate', 'agitated', 'amazing', 'bold', 'brave', 'bright', 'busy', 'calm', 'clever', 'cool', 'dazzling', 'dreamy', 'eager', 'elastic', 'epic', 'fervent', 'focused', 'friendly', 'gallant', 'happy', 'hopeful', 'inspiring', 'jolly', 'keen', 'kind', 'laughing', 'lively', 'loving', 'magical', 'modest', 'nifty', 'peaceful', 'quirky', 'serene', 'sharp', 'sleepy', 'stoic', 'vibrant']
 export const NERDS = ['lovelace', 'turing', 'hopper', 'knuth', 'dijkstra', 'ritchie', 'allen', 'babbage', 'bardeen', 'bell', 'bernerslee', 'bohr', 'borg', 'boyd', 'cerf', 'curie', 'darwin', 'einstein', 'engelbart', 'fermi', 'feynman', 'franklin', 'galileo', 'gates', 'goldberg', 'hamilton', 'hawking', 'heisenberg', 'herschel', 'johnson', 'kay', 'lamarr', 'liskov', 'mccarthy', 'mclean', 'morse', 'newton', 'shannon', 'tesla', 'williams']
@@ -36,11 +36,6 @@ export function serializeEvo(evo: Evo): string {
   let text = '1 ' + evo.stage + ' ' + evo.adjective + ' ' + evo.nerd + ' ' + evo.generation + ' ' + evo.snapshot.length
   for (let i = 0; i < evo.snapshot.length; i++) text += ' ' + evo.snapshot[i].model + ' ' + evo.snapshot[i].tokens
   return text
-}
-function integer(text: string, min: number): boolean {
-  if (text === '') return false
-  const n = Number(text)
-  return Number.isFinite(n) && n >= min && Math.floor(n) === n
 }
 export function parseEvo(text: string): Evo | undefined {
   const parts = text.split(' ')
