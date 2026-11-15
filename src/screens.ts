@@ -30,15 +30,16 @@ export function drawHome(ctx: Context, data: ScreenData, brightness: number): vo
   ctx.fillStyle = '#000000'; ctx.fillRect(50, 375, 366, 60)
   const n = Math.round(119 * brightness), hex = '0123456789abcdef', c = hex[Math.floor(n / 16)] + hex[n % 16]
   text(ctx, 'LV ' + STAGES.indexOf(data.life.stage) + ' ' + evoName(data.evo), 233, 407, 18, '#' + c + c + c)
+  ctx.fillStyle = '#000000'; ctx.fillRect(132, 0, 202, 35)
   if (showBattery(0, data.level, data.charging)) battery(ctx, data.level, data.charging, false)
 }
 function dots(ctx: Context, page: number): void {
   for (let i = 0; i < PAGES; i++) { ctx.beginPath(); ctx.fillStyle = i === page ? ORANGE : TRACK; ctx.arc(203 + i * 20, 422, 4, 0, Math.PI * 2); ctx.fill() }
 }
 export function screenKey(page: number, d: ScreenData): string {
-  let key = page + '|' + d.level + '|' + d.charging + '|' + d.url + '|' + (d.tokens ? JSON.stringify(d.tokens) : '')
-  if (page === 1) key += '|' + d.life.stage + '|' + d.life.branch + '|' + formatPercent(progress(d.life)) + '|' + JSON.stringify(d.evo)
-  if (page === 2) key += '|' + JSON.stringify(d.evo)
+  let key = page + '|' + d.level + '|' + d.charging + '|' + d.url
+  if (d.tokens) key += '|' + d.tokens.generation + '|' + d.tokens.total + '|' + d.tokens.today + '|' + d.tokens.models.length + '|' + sinceEvoTotal(d.evo, d.tokens)
+  if (page === 1) key += '|' + d.life.stage + '|' + d.life.branch + '|' + formatPercent(progress(d.life)) + '|' + evoName(d.evo)
   if (page === 3) key += '|' + d.wifi + '|' + d.feedAge
   return key
 }
@@ -64,11 +65,22 @@ export function drawScreen(ctx: Context, page: number, d: ScreenData): void {
     text(ctx, 'tok / model', 233, 87, 25, TEXT)
     text(ctx, 'Σ ' + formatTokens(t.total) + ' · +' + formatTokens(total), 233, 120, 18, DIM)
     const models = sinceEvo(d.evo, t)
-    for (let i = 0; i < t.models.length && i < 6; i++) {
+    for (let i = 0; i < t.models.length && i < 5; i++) {
       const y = 158 + i * 40
       text(ctx, t.models[i].model.slice(0, 14), 155, y, 15, TEXT)
       text(ctx, formatTokens(t.models[i].tokens), 308, y, 16, TEXT)
       text(ctx, '+' + formatTokens(models[i].tokens), 308, y + 17, 12, DIM)
+    }
+    if (t.models.length > 5) {
+      let remaining = 0
+      let since = 0
+      for (let i = 5; i < t.models.length; i++) {
+        remaining += t.models[i].tokens
+        since += models[i].tokens
+      }
+      text(ctx, 'other', 155, 358, 15, TEXT)
+      text(ctx, formatTokens(remaining), 308, 358, 16, TEXT)
+      text(ctx, '+' + formatTokens(since), 308, 375, 12, DIM)
     }
   } else {
     text(ctx, 'Σ ' + formatTokens(t.total) + ' tok', 233, 105, 27, TEXT)

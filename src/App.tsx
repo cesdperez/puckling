@@ -11,10 +11,15 @@ import { drawHome, drawScreen, screenKey, type ScreenData } from './screens'
 
 const FRAME_MS = 1000 / 30
 const FRAME_TOLERANCE_MS = 4
+const BATTERY_EVERY_MS = 10000
 function wallTime(): number {
-  try { return Clock.epochMs() } catch { return Date.now() }
+  try { return Clock.epochMs() } catch {
+    // The browser sim has no Clock binding.
+    return Date.now()
+  }
 }
 function wifiStatus(): string {
+  // These bindings are missing or partial in the browser sim.
   try { return WiFi.connected() ? 'wifi ' + WiFi.rssi() + 'dBm' : 'wifi down' } catch { return 'wifi n/a' }
 }
 export class App extends Component<GeaCanvasElement> {
@@ -22,54 +27,90 @@ export class App extends Component<GeaCanvasElement> {
   private start: Point | undefined
   private gesture: Gesture = { kind: 'none', x: 0, y: 0, direction: 0 }
   private lastFrame = 0
+  private feeding = { life: restore(localStorage.getItem('life') || ''), sincePoll: 0, sinceSave: 0 }
+  private evo = parseEvo(localStorage.getItem('evo') || '')
+  private pager = createPager()
+  private key = ''
+  private level = 100
+  private charging = false
+  private wifi = ''
+  private batteryAt: number | undefined
+  private tokens: Tokens | undefined
+  private lastBody: string | undefined
+  private feed = new FeedClient()
+  private renderer = new FrameRenderer()
+
+  private pointerDown(x: number, y: number): void { this.start = { x, y } }
+  private pointerUp(x: number, y: number): void {
+    if (this.start) this.gesture = classify(this.start, { x, y })
+    this.start = undefined
+  }
+  private pointerCancel(): void { this.start = undefined }
 
   template() {
-    return <canvas width={SIZE} height={SIZE} onPointerDown={(event) => { this.start = { x: event.clientX, y: event.clientY } }} onPointerUp={(event) => { if (this.start) this.gesture = classify(this.start, { x: event.clientX, y: event.clientY }); this.start = undefined }} onPointerCancel={() => { this.start = undefined }} />
+    return <canvas width={SIZE} height={SIZE} onPointerDown={(event) => this.pointerDown(event.clientX, event.clientY)} onPointerUp={(event) => this.pointerUp(event.clientX, event.clientY)} onPointerCancel={() => this.pointerCancel()} />
   }
   onAfterRender() {
     if (!this.el) return
-    let feeding = { life: restore(localStorage.getItem('life') || ''), sincePoll: 0, sinceSave: 0 }
-    let evo = parseEvo(localStorage.getItem('evo') || '')
-    let pager = createPager(), key = '', level = 100, charging = false, batteryAt = -10000
-    let tokens: Tokens | undefined
-    let lastBody: string | undefined
-    const feed = new FeedClient(), ctx = this.el.getContext('2d'), renderer = new FrameRenderer()
+    const ctx = this.el.getContext('2d')
     const frame = (time: number) => {
+      // rAF ticks every 16ms on the device, so an exact 33.3ms gate skips the 32ms tick and halves to 20fps.
       if (time - this.lastFrame >= FRAME_MS - FRAME_TOLERANCE_MS || this.lastFrame === 0) {
         const dt = this.lastFrame === 0 ? 0 : (time - this.lastFrame) / 1000
         this.lastFrame = time
         const now = wallTime()
-        feed.poll(now)
-        if (feed.body !== lastBody) { lastBody = feed.body; if (lastBody !== undefined) tokens = splitFeed(lastBody).tokens }
-        if (now - batteryAt >= 10000) {
-          batteryAt = now
-          try { level = Battery.level() } catch {}
-          try { charging = Battery.charging() } catch { charging = false }
-        }
-        const result = tick(feeding, dt, () => feed.body !== undefined ? splitFeed(feed.body).food : localStorage.getItem('food') || bytesToText(readCacheFile('/sim/food.txt')))
-        feeding = result.feeding
-        if (result.save) localStorage.setItem('life', serializeLife(feeding.life))
-        const nextEvo = updateEvo(evo, STAGES.indexOf(feeding.life.stage), tokens, Math.random)
-        if (nextEvo !== evo) { evo = nextEvo; localStorage.setItem('evo', serializeEvo(evo)); console.log('puckling: evo ' + evoName(evo)) }
-        const previousPage = pager.page
-        const tap = previousPage === 0 && this.gesture.kind === 'tap' ? { x: this.gesture.x, y: this.gesture.y } : undefined
-        pager = stepPager(pager, this.gesture, dt)
-        this.gesture = { kind: 'none', x: 0, y: 0, direction: 0 }
-        this.pet = step(this.pet, { tap, life: petLife(feeding.life, now), meal: result.meal, evolved: result.evolved }, dt)
-        const data: ScreenData = { life: feeding.life, evo: nextEvo, tokens, level, charging, wifi: pager.page === 3 ? wifiStatus() : '', feedAge: feed.body === undefined ? -1 : Math.max(0, Math.floor((now - feed.arrived) / 1000)), url: feed.url }
-        if (pager.page === 0) {
-          if (previousPage !== 0) renderer.reset()
-          const p = pose(this.pet)
-          renderer.draw(ctx, p)
-          drawHome(ctx, data, p.brightness)
-          key = ''
-        } else {
-          const nextKey = screenKey(pager.page, data)
-          if (nextKey !== key) { drawScreen(ctx, pager.page, data); key = nextKey }
-        }
+        this.sample(now)
+        const previousPage = this.advance(now, dt)
+        this.renderFrame(ctx, now, previousPage)
       }
       requestAnimationFrame(frame)
     }
     requestAnimationFrame(frame)
+  }
+  private sample(now: number): void {
+    this.feed.poll(now)
+    if (this.feed.body !== this.lastBody) {
+      this.lastBody = this.feed.body
+      if (this.lastBody !== undefined) this.tokens = splitFeed(this.lastBody).tokens
+    }
+    if (this.batteryAt === undefined || now - this.batteryAt >= BATTERY_EVERY_MS) {
+      this.batteryAt = now
+      // These bindings are missing or partial in the browser sim.
+      try { this.level = Battery.level() } catch {}
+      try { this.charging = Battery.charging() } catch { this.charging = false }
+      this.wifi = wifiStatus()
+    }
+  }
+  private advance(now: number, dt: number): number {
+    const result = tick(this.feeding, dt, () => this.feed.body !== undefined ? splitFeed(this.feed.body).food : localStorage.getItem('food') || bytesToText(readCacheFile('/sim/food.txt')))
+    this.feeding = result.feeding
+    if (result.save) localStorage.setItem('life', serializeLife(this.feeding.life))
+    const nextEvo = updateEvo(this.evo, STAGES.indexOf(this.feeding.life.stage), this.tokens, Math.random)
+    if (nextEvo !== this.evo) {
+      this.evo = nextEvo
+      localStorage.setItem('evo', serializeEvo(nextEvo))
+      console.log('puckling: evo ' + evoName(nextEvo))
+    }
+    const previousPage = this.pager.page
+    const tap = previousPage === 0 && this.gesture.kind === 'tap' ? { x: this.gesture.x, y: this.gesture.y } : undefined
+    this.pager = stepPager(this.pager, this.gesture, dt)
+    this.gesture = { kind: 'none', x: 0, y: 0, direction: 0 }
+    this.pet = step(this.pet, { tap, life: petLife(this.feeding.life, now), meal: result.meal, evolved: result.evolved }, dt)
+    return previousPage
+  }
+  private renderFrame(ctx: ReturnType<GeaCanvasElement['getContext']>, now: number, previousPage: number): void {
+    if (!this.evo) return
+    const data: ScreenData = { life: this.feeding.life, evo: this.evo, tokens: this.tokens, level: this.level, charging: this.charging, wifi: this.wifi, feedAge: this.feed.body === undefined ? -1 : Math.max(0, Math.floor((now - this.feed.arrived) / 1000)), url: this.feed.url }
+    if (this.pager.page === 0) {
+      if (previousPage !== 0) this.renderer.reset()
+      const p = pose(this.pet)
+      this.renderer.clear(ctx, p)
+      drawHome(ctx, data, p.brightness)
+      this.renderer.paint(ctx, p)
+      this.key = ''
+    } else {
+      const nextKey = screenKey(this.pager.page, data)
+      if (nextKey !== this.key) { drawScreen(ctx, this.pager.page, data); this.key = nextKey }
+    }
   }
 }
