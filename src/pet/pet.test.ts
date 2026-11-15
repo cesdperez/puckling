@@ -1,30 +1,39 @@
 import { describe, expect, test } from "bun:test";
-import { BODY_RADIUS, CENTER, VISIBLE_RADIUS, createPet, pose, step } from "./pet";
+import { BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, step } from "./pet";
 
 describe("pet", () => {
   test("is deterministic and does not mutate its input", () => {
     let a = createPet(123), b = createPet(123);
     for (let i = 0; i < 1000; i++) {
-      const before = structuredClone(a);
+      const original = a;
+      const before = structuredClone(original);
       const input = i % 120 === 0 ? { tap: { x: i % 466, y: 30 } } : {};
       a = step(a, input, 1 / 30);
       b = step(b, input, 1 / 30);
       expect(a).toEqual(b);
-      expect(before).toEqual(i === 0 ? createPet(123) : previous);
-      previous = structuredClone(a);
+      expect(original).toEqual(before);
     }
   });
-  let previous = createPet(123);
 
   test("remains inside the visible circle for ten minutes", () => {
     let state = createPet(7), seed = 1;
+    let worstOverflow = -Infinity;
     for (let i = 0; i < 18000; i++) {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
       const tap = i % 97 === 0 ? { x: seed % 467, y: (seed >>> 12) % 467 } : undefined;
       state = step(state, { tap }, 1 / 30);
       const p = pose(state);
-      expect(Math.hypot(p.x - CENTER, p.y - CENTER) + BODY_RADIUS * Math.max(p.scaleX, p.scaleY) + 8).toBeLessThanOrEqual(VISIBLE_RADIUS);
+      const top = p.y + BODY_RADIUS - (BODY_HEIGHT + LEG_LENGTH) * p.scaleY;
+      const boxes = [
+        [p.x - BODY_HALF_WIDTH * p.scaleX, top, p.x + BODY_HALF_WIDTH * p.scaleX, top + BODY_HEIGHT * p.scaleY],
+        [p.x - ARM_EXTENT * p.scaleX, top + ARM_TOP * p.scaleY, p.x + ARM_EXTENT * p.scaleX, top + (ARM_TOP + ARM_HEIGHT) * p.scaleY],
+        [p.x - BODY_HALF_WIDTH * p.scaleX, top + BODY_HEIGHT * p.scaleY, p.x + BODY_HALF_WIDTH * p.scaleX, top + (BODY_HEIGHT + LEG_LENGTH) * p.scaleY],
+        [p.x - SHADOW_HALF_WIDTH, p.groundY + SHADOW_OFFSET, p.x + SHADOW_HALF_WIDTH, p.groundY + SHADOW_OFFSET + SHADOW_HEIGHT],
+      ];
+      for (const [left, upper, right, lower] of boxes) for (const x of [left, right]) for (const y of [upper, lower])
+        worstOverflow = Math.max(worstOverflow, Math.hypot(x - CENTER, y - CENTER) - VISIBLE_RADIUS);
     }
+    expect(worstOverflow).toBeLessThanOrEqual(0);
     for (const [x, y] of [[0, 0], [466, 0], [0, 466], [466, 466]]) {
       state = step(state, { tap: { x, y } }, 0);
       expect(Math.hypot(state.targetX - CENTER, state.targetY - CENTER) + BODY_RADIUS).toBeLessThan(VISIBLE_RADIUS);
@@ -37,8 +46,11 @@ describe("pet", () => {
     expect(pose(state).eyeOpen).toBe(0);
     for (let i = 0; i < 4; i++) state = step(state, {}, 0.1);
     expect(state.mode).toBe("hop");
+    expect(pose(state).y).toBeLessThan(state.y);
+    expect(pose(state).scaleY).not.toBe(1);
     for (let i = 0; i < 10; i++) state = step(state, {}, 0.1);
     expect(state.mode).toBe("idle");
+    expect(pose(state).eyeOpen).toBe(1);
   });
 
   test("walks to a clamped tap", () => {
@@ -68,8 +80,30 @@ describe("pet", () => {
     expect(pose(state).brightness).toBe(1);
   });
 
+  test("long idle step dims and corner taps flinch", () => {
+    expect(pose(step(createPet(1), {}, 65)).brightness).toBeCloseTo(0.3);
+    expect(step(createPet(1), { tap: { x: 280, y: 170 } }, 0).mode).toBe("flinch");
+  });
+
+  test("dim wandering continues at a slower speed", () => {
+    let dim = step(createPet(4), {}, 65);
+    let moved = false;
+    for (let i = 0; i < 300; i++) {
+      const before = dim;
+      dim = step(dim, {}, 0.1);
+      if (dim.x !== before.x || dim.y !== before.y) moved = true;
+      expect(dim.speed).toBeLessThanOrEqual(28 * 0.3 + 0.01);
+    }
+    expect(moved).toBe(true);
+    const walking = { ...createPet(1), mode: "wander" as const, targetX: CENTER + 80, speed: 0 };
+    let bright = walking, slow = { ...walking, sinceTap: 65 };
+    for (let i = 0; i < 10; i++) { bright = step(bright, {}, 0.1); slow = step(slow, {}, 0.1); }
+    expect(slow.x).toBeGreaterThan(CENTER);
+    expect(slow.x).toBeLessThan(bright.x);
+  });
+
   test("clamps elapsed time", () => {
-    expect(step(createPet(5), {}, 0.5)).toEqual(step(createPet(5), {}, 0.1));
+    expect(step(createPet(5), {}, 0.5)).toEqual({ ...step(createPet(5), {}, 0.1), sinceTap: 0.5 });
     expect(step(createPet(5), {}, -1)).toEqual(step(createPet(5), {}, 0));
   });
 });

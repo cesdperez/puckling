@@ -2,7 +2,26 @@ export const SIZE = 466;
 export const CENTER = SIZE / 2;
 export const VISIBLE_RADIUS = 233;
 export const BODY_RADIUS = 64;
-const REACH = VISIBLE_RADIUS - BODY_RADIUS - 16 - 24;
+export const BODY_HALF_WIDTH = BODY_RADIUS * 0.75;
+export const BODY_HEIGHT = BODY_RADIUS * 1.59375;
+export const ARM_EXTENT = BODY_RADIUS;
+export const ARM_TOP = BODY_RADIUS * 0.796875;
+export const ARM_HEIGHT = BODY_RADIUS * 0.40625;
+export const LEG_LENGTH = BODY_RADIUS * 0.40625;
+export const SHADOW_HALF_WIDTH = BODY_RADIUS * 0.53125;
+export const SHADOW_OFFSET = BODY_RADIUS * 1.015625;
+export const SHADOW_HEIGHT = BODY_RADIUS * 0.0625;
+export const HOP_LIFT = BODY_RADIUS * 0.3125;
+const MAX_SCALE = 1.12;
+const DRAW_REACH = Math.max(
+  Math.sqrt(ARM_EXTENT * ARM_EXTENT + BODY_RADIUS * BODY_RADIUS) * MAX_SCALE + HOP_LIFT,
+  Math.sqrt(SHADOW_HALF_WIDTH * SHADOW_HALF_WIDTH + (SHADOW_OFFSET + SHADOW_HEIGHT) * (SHADOW_OFFSET + SHADOW_HEIGHT)),
+);
+const REACH = VISIBLE_RADIUS - DRAW_REACH;
+const DIM_AFTER = 60;
+const DIM_RAMP = 2;
+const DIM_LEVEL = 0.3;
+const BLINK_DURATION = 0.15;
 const MAX_DT = 0.1;
 
 export type PetMode = "idle" | "look" | "wander" | "walk" | "flinch" | "hop";
@@ -13,9 +32,8 @@ export type PetState = {
   blinkIn: number; blinkTime: number; facing: -1 | 1; speed: number;
 };
 export type PetPose = {
-  x: number; y: number; bodyRadius: number; scaleX: number; scaleY: number;
-  facing: -1 | 1; eyeOpen: number; lookX: number; lookY: number;
-  mode: PetMode; brightness: number;
+  x: number; y: number; groundY: number; scaleX: number; scaleY: number;
+  facing: -1 | 1; eyeOpen: number; lookX: number; brightness: number;
 };
 
 function random(state: PetState): number {
@@ -48,26 +66,32 @@ export function createPet(seed: number): PetState {
   return state;
 }
 
-export function step(previous: PetState, input: PetInput, dt: number): PetState {
-  const state = { ...previous };
-  const delta = dt > 0 ? Math.min(dt, MAX_DT) : 0;
+function advanceClocks(state: PetState, dt: number, delta: number): void {
   state.time += delta;
-  state.sinceTap += delta;
+  state.sinceTap += Math.max(0, dt);
   state.modeTime += delta;
+}
+
+function updateBlink(state: PetState, delta: number): void {
   if (state.blinkTime > 0) {
     state.blinkTime = Math.max(0, state.blinkTime - delta);
   } else {
     state.blinkIn -= delta;
     if (state.blinkIn <= 0) {
-      state.blinkTime = 0.15;
+      state.blinkTime = BLINK_DURATION;
       state.blinkIn = 2 + random(state) * 4;
     }
   }
+}
+
+function applyTap(state: PetState, input: PetInput): void {
   if (input.tap) {
     state.sinceTap = 0;
     const current = pose(state);
-    const dx = input.tap.x - current.x, dy = input.tap.y - current.y;
-    if (dx * dx + dy * dy <= (BODY_RADIUS + 12) * (BODY_RADIUS + 12)) {
+    const dx = input.tap.x - current.x;
+    if (Math.abs(dx) <= BODY_HALF_WIDTH * current.scaleX + 12 &&
+        input.tap.y >= current.y + BODY_RADIUS - (BODY_HEIGHT + LEG_LENGTH) * current.scaleY - 12 &&
+        input.tap.y <= current.y + BODY_RADIUS - LEG_LENGTH * current.scaleY + 12) {
       state.mode = "flinch";
       state.modeTime = 0;
       state.speed = 0;
@@ -78,6 +102,9 @@ export function step(previous: PetState, input: PetInput, dt: number): PetState 
       state.speed = 0;
     }
   }
+ }
+
+function nextMode(state: PetState): void {
   if (state.mode === "flinch" && state.modeTime >= 0.25) {
     state.mode = "hop";
     state.modeTime = 0;
@@ -97,6 +124,9 @@ export function step(previous: PetState, input: PetInput, dt: number): PetState 
       idle(state);
     }
   }
+}
+
+function move(state: PetState, delta: number): void {
   if (state.mode === "walk" || state.mode === "wander") {
     const dx = state.targetX - state.x, dy = state.targetY - state.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -111,7 +141,7 @@ export function step(previous: PetState, input: PetInput, dt: number): PetState 
       } else idle(state);
     } else {
       if (Math.abs(dx) > 0.1) state.facing = dx < 0 ? -1 : 1;
-      const maxSpeed = state.sinceTap >= 60 ? 12 : 28;
+      const maxSpeed = 28 * (1 - (1 - DIM_LEVEL) * Math.min(1, Math.max(0, (state.sinceTap - DIM_AFTER) / DIM_RAMP)));
       const desired = Math.min(maxSpeed, Math.max(3, distance * 2));
       state.speed += (desired - state.speed) * Math.min(1, delta * 3);
       const movement = Math.min(distance, state.speed * delta);
@@ -119,6 +149,16 @@ export function step(previous: PetState, input: PetInput, dt: number): PetState 
       state.y += dy / distance * movement;
     }
   }
+}
+
+export function step(previous: PetState, input: PetInput, dt: number): PetState {
+  const state = { ...previous };
+  const delta = dt > 0 ? Math.min(dt, MAX_DT) : 0;
+  advanceClocks(state, dt, delta);
+  updateBlink(state, delta);
+  applyTap(state, input);
+  nextMode(state);
+  move(state, delta);
   return state;
 }
 
@@ -127,21 +167,20 @@ export function pose(state: PetState): PetPose {
   if (state.mode === "flinch") squash = 0.12;
   if (state.mode === "hop") {
     const phase = Math.min(1, state.modeTime / 0.8);
-    lift = 20 * Math.sin(Math.PI * phase);
+    lift = HOP_LIFT * Math.sin(Math.PI * phase);
     squash = phase < 0.12 ? 0.1 * (1 - phase / 0.12) : phase > 0.85 ? 0.12 * (phase - 0.85) / 0.15 : -0.05;
   } else if (state.mode === "idle" || state.mode === "look") {
     squash = 0.015 * Math.sin(state.time * 2);
   } else if (state.mode === "walk" || state.mode === "wander") {
     lift = 2 * Math.abs(Math.sin(state.time * 5));
   }
-  const blinking = state.blinkTime > 0 ? Math.abs(state.blinkTime - 0.075) / 0.075 : 1;
+  const blinking = state.blinkTime > 0 ? Math.abs(state.blinkTime - BLINK_DURATION / 2) / (BLINK_DURATION / 2) : 1;
   return {
-    x: state.x, y: state.y - lift, bodyRadius: BODY_RADIUS,
+    x: state.x, y: state.y - lift, groundY: state.y,
     scaleX: 1 + squash, scaleY: 1 - squash, facing: state.facing,
     eyeOpen: state.mode === "flinch" ? 0 : Math.min(1, blinking),
     lookX: state.mode === "look" ? Math.sin(state.modeTime * 1.5) * 4 :
       state.mode === "walk" || state.mode === "wander" ? state.facing * 3 : 0,
-    lookY: 0, mode: state.mode,
-    brightness: 1 - 0.7 * Math.min(1, Math.max(0, (state.sinceTap - 60) / 2)),
+    brightness: 1 - (1 - DIM_LEVEL) * Math.min(1, Math.max(0, (state.sinceTap - DIM_AFTER) / DIM_RAMP)),
   };
 }
