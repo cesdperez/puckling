@@ -1,10 +1,10 @@
 import type { GeaCanvasElement } from '@geastack/core'
-import { SIZE, poseBounds, poseRects, type Bounds, type PetPose } from './pet/pet'
+import { SIZE, type PetPose } from './pet/pet'
+import { poseRects, poseBounds, type Bounds } from './pet/shape'
 
 type Context2D = ReturnType<GeaCanvasElement['getContext']>
 
 const BACKGROUND = '#000000'
-const EYES = '#000000'
 type Frame = { bounds: Bounds; brightness: number }
 
 function colour(r: number, g: number, b: number, brightness: number): string {
@@ -38,12 +38,12 @@ export class FrameRenderer {
 }
 
 function paint(ctx: Context2D, p: PetPose): void {
-  let part: string | undefined
+  let previousColour = BACKGROUND
   for (const rect of poseRects(p)) {
-    if (rect.part !== part) {
-      part = rect.part
-      ctx.fillStyle = part === 'shadow' ? colour(40, 32, 29, p.brightness) :
-        part === 'body' ? colour(217, 119, 87, p.brightness) : EYES
+    const nextColour = colour(rect.r, rect.g, rect.b, p.brightness)
+    if (nextColour !== previousColour) {
+      ctx.fillStyle = nextColour
+      previousColour = nextColour
     }
     ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
   }

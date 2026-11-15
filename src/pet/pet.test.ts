@@ -1,6 +1,8 @@
 import { FrameRenderer } from "../render";
 import { describe, expect, test } from "bun:test";
-import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, poseBounds, poseRects, step } from "./pet";
+import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, step } from "./pet";
+
+import { poseBounds, poseRects } from "./shape";
 
 describe("pet", () => {
   test("pose bounds contain every painted rectangle", () => {
