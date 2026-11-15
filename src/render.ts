@@ -29,6 +29,8 @@ function clearDirty(ctx: Context2D, bounds: Bounds, brightness: number, previous
 export class FrameRenderer {
   private previous: Frame | undefined
 
+  reset(): void { this.previous = undefined }
+
   draw(ctx: Context2D, p: PetPose): void {
     const rects = poseRects(p)
     const bounds = rectsBounds(rects)
