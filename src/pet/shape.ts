@@ -1,5 +1,19 @@
-import { SIZE, type PetPose } from "./pet";
+import type { PetPose } from "./pet";
 import type { Stage, Branch } from "./life";
+
+export const SIZE = 466;
+export const CENTER = SIZE / 2;
+export const VISIBLE_RADIUS = SIZE / 2;
+export const BODY_RADIUS = 64;
+const SHADOW_HALF_WIDTH = 34;
+const SHADOW_OFFSET = 65;
+const SHADOW_HEIGHT = 4;
+
+export const FORMS: { stage: Stage; branch: Branch }[] = [
+  { stage: "egg", branch: "none" }, { stage: "baby", branch: "none" },
+  { stage: "child", branch: "none" }, { stage: "teen", branch: "none" },
+];
+for (const stage of ["adult", "final"] as Stage[]) for (const branch of ["ember", "frost", "moss", "night", "swarm"] as Branch[]) FORMS.push({ stage, branch });
 
 export type Bounds = { x: number; y: number; width: number; height: number };
 export type PoseRect = Bounds & { part: "shadow" | "body" | "face" | "fx"; r: number; g: number; b: number };
@@ -132,8 +146,8 @@ function overlays(d: Drawing): void {
 }
 export function poseRects(p: PetPose): PoseRect[] {
   const lift = p.groundY - p.y;
-  const rects: PoseRect[] = [{ x: p.x - 34 + lift / 2, y: p.groundY + 65, width: 68 - lift, height: 4, part: "shadow", r: 40, g: 32, b: 29 }];
-  const d: Drawing = { p, rects, radius: 64 * p.formScale * p.form, color: color(p) };
+  const rects: PoseRect[] = [{ x: p.x - SHADOW_HALF_WIDTH * p.formScale + lift / 2, y: p.groundY + SHADOW_OFFSET * p.formScale, width: Math.max(0, SHADOW_HALF_WIDTH * 2 * p.formScale - lift), height: SHADOW_HEIGHT * p.formScale, part: "shadow", r: 40, g: 32, b: 29 }];
+  const d: Drawing = { p, rects, radius: BODY_RADIUS * p.formScale * p.form, color: color(p) };
   if (d.radius > 0) { creature(d); overlays(d); }
   return rects;
 }

@@ -3,14 +3,10 @@ import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createPet, pose } from "../src/pet/pet";
-import { formScale, poseRects } from "../src/pet/shape";
+import { FORMS, formScale, poseRects } from "../src/pet/shape";
 import type { Stage, Branch } from "../src/pet/life";
 
-const forms: { stage: Stage; branch: Branch; label: string }[] = [
-  { stage: "egg", branch: "none", label: "egg" }, { stage: "baby", branch: "none", label: "baby" },
-  { stage: "child", branch: "none", label: "child" }, { stage: "teen", branch: "none", label: "teen" },
-];
-for (const stage of ["adult", "final"] as Stage[]) for (const branch of ["ember", "frost", "moss", "night", "swarm"] as Branch[]) forms.push({ stage, branch, label: `${stage} ${branch}` });
+const forms: { stage: Stage; branch: Branch; label: string }[] = FORMS.map(f => ({ ...f, label: f.branch === "none" ? f.stage : `${f.stage} ${f.branch}` }));
 forms.push({ stage: "egg", branch: "none", label: "cracked egg" }, { stage: "adult", branch: "ember", label: "eating" }, { stage: "adult", branch: "frost", label: "sleeping" }, { stage: "teen", branch: "none", label: "evolving" });
 const cols = 4, rows = Math.ceil(forms.length / cols);
 let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cols * 466}" height="${rows * 466}"><rect width="100%" height="100%" fill="black"/>`;

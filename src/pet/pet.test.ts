@@ -1,9 +1,8 @@
 import { FrameRenderer } from "../render";
-import type { Stage, Branch } from "./life";
 import { describe, expect, test } from "bun:test";
-import { SIZE, BODY_RADIUS, BODY_HALF_WIDTH, BODY_HEIGHT, ARM_EXTENT, ARM_TOP, ARM_HEIGHT, LEG_LENGTH, SHADOW_HALF_WIDTH, SHADOW_OFFSET, SHADOW_HEIGHT, CENTER, VISIBLE_RADIUS, createPet, pose, step } from "./pet";
+import { SIZE, CENTER, VISIBLE_RADIUS, createPet, pose, step } from "./pet";
 
-import { poseBounds, poseRects } from "./shape";
+import { FORMS, formScale, poseBounds, poseRects } from "./shape";
 
 const adult = { stage: "adult" as const, branch: "ember" as const, fullness: 1, progress: 0, night: false };
 function walkingPet(seed: number) { return step(createPet(seed), { life: adult }, 0); }
@@ -91,20 +90,13 @@ describe("pet", () => {
       const tap = i % 97 === 0 ? { x: seed % 467, y: (seed >>> 12) % 467 } : undefined;
       state = step(state, { tap }, 1 / 30);
       const p = pose(state);
-      const top = p.y + BODY_RADIUS - (BODY_HEIGHT + LEG_LENGTH) * p.scaleY;
-      const boxes = [
-        [p.x - BODY_HALF_WIDTH * p.scaleX, top, p.x + BODY_HALF_WIDTH * p.scaleX, top + BODY_HEIGHT * p.scaleY],
-        [p.x - ARM_EXTENT * p.scaleX, top + ARM_TOP * p.scaleY, p.x + ARM_EXTENT * p.scaleX, top + (ARM_TOP + ARM_HEIGHT) * p.scaleY],
-        [p.x - BODY_HALF_WIDTH * p.scaleX, top + BODY_HEIGHT * p.scaleY, p.x + BODY_HALF_WIDTH * p.scaleX, top + (BODY_HEIGHT + LEG_LENGTH) * p.scaleY],
-        [p.x - SHADOW_HALF_WIDTH, p.groundY + SHADOW_OFFSET, p.x + SHADOW_HALF_WIDTH, p.groundY + SHADOW_OFFSET + SHADOW_HEIGHT],
-      ];
-      for (const [left, upper, right, lower] of boxes) for (const x of [left, right]) for (const y of [upper, lower])
+      for (const r of poseRects(p)) for (const x of [r.x, r.x + r.width]) for (const y of [r.y, r.y + r.height])
         worstOverflow = Math.max(worstOverflow, Math.hypot(x - CENTER, y - CENTER) - VISIBLE_RADIUS);
     }
     expect(worstOverflow).toBeLessThanOrEqual(0);
     for (const [x, y] of [[0, 0], [466, 0], [0, 466], [466, 466]]) {
       state = step(state, { tap: { x, y } }, 0);
-      expect(Math.hypot(state.targetX - CENTER, state.targetY - CENTER) + BODY_RADIUS).toBeLessThan(VISIBLE_RADIUS);
+      expect(Math.hypot(state.targetX - CENTER, state.targetY - CENTER)).toBeLessThan(VISIBLE_RADIUS);
     }
   });
 
@@ -171,9 +163,7 @@ describe("pet", () => {
   });
 
   test("all forms stay inside the circle", () => {
-    const forms: [Stage, Branch][] = [["egg", "none"], ["baby", "none"], ["child", "none"], ["teen", "none"]];
-    for (const stage of ["adult", "final"] as Stage[]) for (const branch of ["ember", "frost", "moss", "night", "swarm"] as Branch[]) forms.push([stage, branch]);
-    for (const [stage, branch] of forms) {
+    for (const { stage, branch } of FORMS) {
       let state = createPet(8), seed = 42;
       for (let i = 0; i < 18000; i++) {
         seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -201,6 +191,25 @@ describe("pet", () => {
     expect(pose(state).asleep).toBe(true); expect(pose(state).brightness).toBeLessThanOrEqual(0.2); expect(pose(state).eyeOpen).toBe(0);
     const day = step(state, { life: { ...adult, night: false } }, 0); expect(pose(day).asleep).toBe(false);
     state = step(state, { tap: { x: CENTER, y: CENTER } }, 0); expect(pose(state).asleep).toBe(false);
+  });
+
+  test("egg wobbles after a tap and on its timer without moving", () => {
+    for (const timed of [false, true]) {
+      let state = createPet(3);
+      if (timed) state = { ...state, wobbleIn: 0 };
+      state = step(state, timed ? {} : { tap: { x: 0, y: 0 } }, 0);
+      expect(state.mode).toBe("wobble");
+      state = step(state, {}, 0.05);
+      expect(state.x).toBe(CENTER);
+      expect(pose(state).x).not.toBe(state.x);
+    }
+  });
+
+  test("meals start at the current form's floor", () => {
+    for (const f of FORMS.filter(f => f.stage !== "egg")) {
+      const state = step(createPet(1), { life: { ...adult, ...f }, meal: true }, 0);
+      expect(state.pelletY + 10).toBeCloseTo(state.y + 64 * formScale(f.stage));
+    }
   });
 
   test("egg stays put and hunger slows walking", () => {

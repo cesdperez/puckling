@@ -1,19 +1,7 @@
 import type { Stage, Branch } from "./life";
-import { formScale, formExtent, poseRects } from "./shape";
+import { BODY_RADIUS, CENTER, VISIBLE_RADIUS, formScale, formExtent, poseRects } from "./shape";
+export { SIZE, CENTER, VISIBLE_RADIUS } from "./shape";
 
-export const SIZE = 466;
-export const CENTER = SIZE / 2;
-export const VISIBLE_RADIUS = 233;
-export const BODY_RADIUS = 64;
-export const BODY_HALF_WIDTH = BODY_RADIUS * 0.75;
-export const BODY_HEIGHT = BODY_RADIUS * 1.59375;
-export const ARM_EXTENT = BODY_RADIUS;
-export const ARM_TOP = BODY_RADIUS * 0.796875;
-export const ARM_HEIGHT = BODY_RADIUS * 0.40625;
-export const LEG_LENGTH = BODY_RADIUS * 0.40625;
-export const SHADOW_HALF_WIDTH = BODY_RADIUS * 0.53125;
-export const SHADOW_OFFSET = BODY_RADIUS * 1.015625;
-export const SHADOW_HEIGHT = BODY_RADIUS * 0.0625;
 export const HOP_LIFT = BODY_RADIUS * 0.3125;
 const DIM_AFTER = 60;
 const DIM_RAMP = 2;
@@ -48,12 +36,24 @@ function reach(state: PetState): number {
   return VISIBLE_RADIUS - formExtent(state.life.stage, state.life.branch) - HOP_LIFT;
 }
 
-function target(state: PetState, x: number, y: number): void {
+function clampToCircle(x: number, y: number, radius: number): { x: number; y: number } {
   const dx = x - CENTER, dy = y - CENTER;
   const distance = Math.sqrt(dx * dx + dy * dy);
-  const scale = distance > reach(state) ? reach(state) / distance : 1;
-  state.targetX = CENTER + dx * scale;
-  state.targetY = CENTER + dy * scale;
+  const scale = distance > radius ? radius / distance : 1;
+  return { x: CENTER + dx * scale, y: CENTER + dy * scale };
+}
+
+function target(state: PetState, x: number, y: number): void {
+  const point = clampToCircle(x, y, reach(state));
+  state.targetX = point.x;
+  state.targetY = point.y;
+}
+
+function clampToReach(state: PetState): void {
+  // Reach changes when the pet changes form.
+  const point = clampToCircle(state.x, state.y, reach(state));
+  state.x = point.x; state.y = point.y;
+  target(state, state.targetX, state.targetY);
 }
 
 function idle(state: PetState): void {
@@ -123,12 +123,10 @@ function applyTap(state: PetState, input: PetInput): void {
 function meal(state: PetState): void {
   if (state.mode === "sleep" || state.mode === "evolve" || state.mode === "eat") return;
   if (state.life.stage === "egg") { setMode(state, "wobble"); return; }
-  const x = state.x + state.facing * 40, y = state.y + 45;
-  const dx = x + 5 - CENTER, dy = y + 5 - CENTER;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  const scale = distance > VISIBLE_RADIUS - 17 ? (VISIBLE_RADIUS - 17) / distance : 1;
-  state.pelletX = CENTER + dx * scale - 5;
-  state.pelletY = CENTER + dy * scale - 5;
+  const x = state.x + state.facing * 40, y = state.y + BODY_RADIUS * formScale(state.life.stage) - 10;
+  const point = clampToCircle(x + 5, y + 5, VISIBLE_RADIUS - 17);
+  state.pelletX = point.x - 5;
+  state.pelletY = point.y - 5;
   target(state, state.pelletX - state.facing * 20, state.y);
   state.eating = true;
   setMode(state, "eat");
@@ -142,10 +140,14 @@ function updateLife(state: PetState, input: PetInput): void {
     setMode(state, "evolve");
   }
   if (input.life) state.life = { ...input.life };
-  const x = state.x, y = state.y, tx = state.targetX, ty = state.targetY;
-  target(state, x, y); state.x = state.targetX; state.y = state.targetY;
-  target(state, tx, ty);
+  clampToReach(state);
+}
+
+function wake(state: PetState): void {
   if (state.mode === "sleep" && !state.life.night) idle(state);
+}
+
+function startMeal(state: PetState, input: PetInput): void {
   if (input.meal && !input.evolved) meal(state);
 }
 
@@ -210,6 +212,8 @@ export function step(previous: PetState, input: PetInput, dt: number): PetState 
   advanceClocks(state, dt, delta);
   updateBlink(state, delta);
   updateLife(state, input);
+  wake(state);
+  startMeal(state, input);
   applyTap(state, input);
   nextMode(state);
   move(state, delta);
