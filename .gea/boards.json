@@ -1,0 +1,7 @@
+{
+  "puck": {
+    "target": "esp32-s3-touch-amoled-1.75c",
+    "adapter": "esp32-idf",
+    "appPlatform": "esp32"
+  }
+}
