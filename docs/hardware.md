@@ -17,7 +17,7 @@ Board: **Waveshare ESP32-S3-Touch-AMOLED-1.75C**.
 
 `.gea/boards.json` aliases `puck` to the upstream GeaStack target `esp32-s3-touch-amoled-1.75c`. That target carries this board's pins, flash size, CO5300 panel, AXP2101 PMU and CST9217 touch, so the app never spells out pins itself.
 
-The `puck` alias also carries the board's USB serial, so flash, monitor and screenshot find it without a port argument. Set it with `npx gea boards set puck serial <serial> --local`, because a project alias replaces a home (`~/.geastack`) alias of the same name instead of merging its fields.
+The `puck` alias carries this puck's USB serial, so flash, monitor and screenshot find it without `--port`. With a different board, run `npx gea boards set puck serial <serial> --local` using the serial `npx gea boards discover` shows. The project alias replaces a home (`~/.geastack`) alias of the same name instead of merging its fields, so a home alias cannot correct it.
 
 `npx gea doctor` reports the toolchain state. GeaStack setup does not install ESP-IDF or CMake; install both, with ESP-IDF v6, before the first firmware build.
 
