@@ -13,7 +13,7 @@ The app is built with [GeaStack](https://geastack.com). The same TypeScript runs
 ```sh
 npm install
 npm run sim          # browser sim, mouse acts as touch
-npm test             # bun test src/pet src/render.test.ts scripts/feeder
+npm test             # bun test src scripts/feeder
 npm run check        # tsc --noEmit
 ```
 
@@ -23,7 +23,7 @@ The emulator shell is at http://127.0.0.1:5181/__gea_emulator.
 
 ## Feed it
 
-The feeder runs on Bun. It reads token usage from the Claude Code, Codex and opencode transcripts on this Mac and writes one food line to the puck.
+The feeder runs on Bun. It reads token usage from the Claude Code, Codex and opencode transcripts on this Mac and feeds the puck, over Wi-Fi or USB.
 
 ```sh
 npm run feed                 # one update over USB
@@ -34,7 +34,21 @@ npm run feed -- --backfill 7 # first run only: also eat the last 7 days
 npm run feed:report          # weighted tokens per tool over the last 7 days
 ```
 
-The first run starts from now, so a new feeder sees an egg. `--port <dev>` or `PUCKLING_PORT` picks the puck when it is not the configured serial. A running sim reads `feed/food.txt` through the `gea.webPreload` entry in `package.json`. Feeder state lives in `~/.local/state/puckling/feeder.json`.
+Over Wi-Fi the feeder also serves `GET /feed` on port 7878, and the puck polls it every 5 seconds:
+
+```sh
+printf 'GEA_WIFI_SSID=my-network\nGEA_WIFI_PASSWORD=secret\n' > .env  # gitignored
+npm run build:firmware       # GeaStack compiles the credentials into the firmware
+npm run flash                # then reboot with the puck unplugged
+npm run feed:serve           # feeder every 5 s, plus GET /feed on port 7878
+npm run feed:pair            # once, with the puck on USB: stores the feed URL
+```
+
+`feed:serve` sends nothing over USB. `--sim` still writes `feed/food.txt`. The body carries counts and model names only, never transcript text. `feed:pair` stores the Mac's LAN address on the puck, so run it again when the address changes. Until then the puck reads `http://127.0.0.1:7878/feed`, which is what the browser sim needs.
+
+A new feeder starts from now, so it sees an egg. For history, the first run takes `npm run feed:serve -- --backfill 42` to eat the last 42 days. `--port <dev>` or `PUCKLING_PORT` picks the puck when it is not the configured serial. A running sim reads `feed/food.txt` through the `gea.webPreload` entry in `package.json`. Feeder state lives in `~/.local/state/puckling/feeder.json`.
+
+Swipe left or right to move between four pages: the pet, level and evolution, tokens per model, and system status. The stats pages return to the pet after 20 seconds without a touch.
 
 `npm run gallery [file.png]` renders every form, plus eating, sleeping and evolving, to a PNG (default `./forms.png`).
 
@@ -49,7 +63,7 @@ npm run screenshot   # device screen to a PNG
 
 `npx gea doctor` checks the toolchain, and `npx gea devctl help` lists device control. See [docs/hardware.md](docs/hardware.md) for board and toolchain requirements. The optional wasm sim renderer (`--renderer wasm`) needs emsdk.
 
-Food over USB, eating, hatching, and growth across reboots are checked on the puck. Touch, brightness and frame rate are not yet checked there.
+Food over USB, eating, hatching, and growth across reboots are checked on the puck. The Wi-Fi feed, the screens and the battery arc are not yet checked there, nor are touch, brightness and frame rate.
 
 ### Reset growth
 

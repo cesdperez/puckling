@@ -31,7 +31,11 @@ The `puck` alias carries this puck's USB serial, so flash, monitor and screensho
 - `geatsc` cannot use the canvas context as a WeakMap key, since a native handle has no reference identity on the device; keep per-canvas state on an object the component owns.
 - `gea flash`, `gea monitor`, `gea screenshot` and `gea devctl` accept `--port <dev>`, although their help does not list it.
 - Right after a flash, `gea screenshot` returns `display-unavailable` and `gea devctl summary` times out until the app finishes booting. Wait a few seconds, or reboot the board.
-- NVS keys are at most 15 characters, and `localStorage` on the device is NVS. That is why the keys are `food` and `life`.
+- NVS keys are at most 15 characters, and `localStorage` on the device is NVS. That is why the keys are `food`, `life`, `evo` and `feedurl`.
+- `fetchAsync`, `fetchReady`, `fetchResult` and `fetchRelease` are globals on the device. Importing them from `@geastack/core` fails the firmware build, although the sim accepts the import.
+- `geatsc` fails on `JSON.stringify` of an optional value. Pass a defined value, or stringify it behind a guard.
+- `fillText` anchors the top-left of the text, and `textAlign` does nothing. Centre a string yourself with `measureText` and subtract half the width.
+- The browser sim's `Battery` has `level()` only, with no `charging()`, and no `measureTextInkCenter`. Calls to those sit in `try`/`catch`.
 - `gea devctl storage set <key> <value>` writes the app's NVS-backed `localStorage`. It presets the food line the feeder sends, and `storage set life 0` resets growth, because the text does not parse as a life. The running app overwrites the key on its next save, so reboot straight after a reset.
 - The browser sim has no Clock host binding. `src/App.tsx` catches that and falls back to `Date.now()` for wall time, so night still works in the sim.
 - macOS has no `timeout`. A monitor wrapped as `perl -e 'alarm N; exec @ARGV' npx gea monitor` kills only `npx`, and its node child keeps the serial port, so the next flash or monitor fails. Run `node_modules/.bin/gea monitor` under the same wrapper instead, with no npx in between.
