@@ -11,6 +11,11 @@ import {
 } from "./state";
 import { weigh } from "./weigh";
 import { deliver, formatFood } from "./deliver";
+function newMeal(meal: Meal, since: number, seen: Record<string, number>): boolean {
+  if (!Number.isFinite(meal.time) || meal.time < since || seen[meal.id] !== undefined) return false;
+  seen[meal.id] = meal.time;
+  return true;
+}
 export function applyMeals(
   state: State,
   meals: Meal[],
@@ -19,13 +24,7 @@ export function applyMeals(
 ) {
   const eaten = { claude: 0, codex: 0, opencode: 0 };
   for (const m of meals.sort((a, b) => a.time - b.time)) {
-    if (
-      !Number.isFinite(m.time) ||
-      m.time < since ||
-      state.seen[m.id] !== undefined
-    )
-      continue;
-    state.seen[m.id] = m.time;
+    if (!newMeal(m, since, state.seen)) continue;
     const kcal = weigh(m.usage, m.model) / 1000;
     eaten[m.tool] += kcal;
     state.counters.total += kcal;
@@ -40,7 +39,7 @@ export function applyMeals(
       state.counters.parallel += kcal;
   }
   for (const [id, time] of Object.entries(state.seen))
-    if (time < now - 3 * 86400000) delete state.seen[id];
+    if (time < Math.min(now - 3 * 86400000, state.watermark - 3600000)) delete state.seen[id];
   state.recent = state.recent.filter((x) => x.time >= now - 600000);
   return eaten;
 }
@@ -57,13 +56,12 @@ export function startFromNow(state: State, now = Date.now()) {
   state.watermark = now;
 }
 export function countReport(meals: Meal[], since: number) {
-  const unique = new Set<string>();
+  const unique: Record<string, number> = {};
   const totals = { claude: 0, codex: 0, opencode: 0 };
   const counts = { claude: 0, codex: 0, opencode: 0 };
   for (const meal of meals) {
-    if (!Number.isFinite(meal.time) || meal.time < since || unique.has(meal.id))
+    if (!newMeal(meal, since, unique))
       continue;
-    unique.add(meal.id);
     totals[meal.tool] += weigh(meal.usage, meal.model);
     counts[meal.tool]++;
   }
@@ -107,25 +105,25 @@ async function runOnce(args: string[], backfill?: string) {
     deliver(line, state, {
       sim: args.includes("--sim"),
       dryRun: args.includes("--dry-run"),
-      port: value("--port"),
+      port: value(args, "--port"),
     })
   ) {
     state.lastSent = line;
     saveState(state);
   }
 }
-function value(flag: string) {
-  const i = process.argv.indexOf(flag);
+function value(args: string[], flag: string) {
+  const i = args.indexOf(flag);
   if (i < 0) return undefined;
-  if (!process.argv[i + 1] || process.argv[i + 1].startsWith("--"))
+  if (!args[i + 1] || args[i + 1].startsWith("--"))
     throw new Error(`Missing value for ${flag}`);
-  return process.argv[i + 1];
+  return args[i + 1];
 }
 async function main() {
   const args = process.argv;
-  const days = Number(value("--days") ?? 7);
-  const backfill = value("--backfill");
-  const watch = value("--watch");
+  const days = Number(value(args, "--days") ?? 7);
+  const backfill = value(args, "--backfill");
+  const watch = value(args, "--watch");
   if (
     !Number.isFinite(days) ||
     days <= 0 ||

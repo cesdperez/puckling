@@ -51,7 +51,7 @@ function toMeal(
     id: `codex:${id}`,
     tool: "codex",
     model,
-    session: p.session_id || path,
+    session: p.thread_id || p.session_id || path,
     time: Date.parse(x.timestamp),
     usage: {
       input: Math.max(
@@ -68,7 +68,9 @@ function toMeal(
 }
 async function readFile(state: State, path: string): Promise<Meal[]> {
   const previous = state.offsets[path] || 0;
-  const rewritten = statSync(path).size < previous;
+  const size = statSync(path).size;
+  if (size === previous) return [];
+  const rewritten = size < previous;
   const offset = rewritten ? 0 : previous;
   if (rewritten) {
     delete state.hasRecords[path];

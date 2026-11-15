@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { mkdtempSync, writeFileSync, appendFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, appendFileSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
@@ -9,7 +9,7 @@ import { readClaude } from "./claude";
 import { readCodex } from "./codex";
 import { readOpencode } from "./opencode";
 import { applyMeals, countReport } from "./main";
-import { formatFood } from "./deliver";
+import { deliver, formatFood } from "./deliver";
 const dir = () => mkdtempSync(join(tmpdir(), "puckling-test-"));
 test("weight and model factors", () => {
   expect(modelFactor("GPT-opus")).toBe(1);
@@ -114,7 +114,7 @@ test("night, parallel, dedupe and food format", () => {
   expect(s.counters.night).toBe(3);
   expect(s.counters.parallel).toBe(1);
   expect(formatFood(s, new Date(time))).toBe(
-    `1 3 3 0 0 3 1 ${-new Date(time).getTimezoneOffset()}`,
+    `1 3 3 0 0 3 1 ${-new Date(time).getTimezoneOffset()} ${s.generation}`,
   );
 });
 
@@ -223,4 +223,43 @@ test("codex persists record mode and switches when records appear", async () => 
   );
   expect((await readCodex(state, d)).length).toBe(1);
   expect(state.hasRecords[p]).toBe(true);
+});
+
+test("idle opencode watermark keeps dedupe entries", () => {
+  const state = emptyState(), time = Date.now() - 4 * 86400000;
+  state.watermark = time;
+  const meal = { id: "opencode:a", tool: "opencode" as const, model: "opus", session: "s", time, usage: { input: 1000, output: 0, cacheRead: 0, cacheWrite: 0 } };
+  applyMeals(state, [meal], 0, time);
+  applyMeals(state, [meal], 0, Date.now());
+  applyMeals(state, [meal], 0, Date.now());
+  expect(state.counters.total).toBe(1);
+});
+test("subagents have distinct sessions and rewritten Claude files dedupe", async () => {
+  const d = dir(), p = join(d, "a.jsonl"), state = emptyState(), timestamp = new Date().toISOString();
+  const line = (id: string, agentId: string) => JSON.stringify({ type: "assistant", timestamp, sessionId: "parent", agentId, message: { id, model: "opus", usage: { input_tokens: 1000 } } }) + "\n";
+  writeFileSync(p, line("a", "one") + line("b", "two"));
+  const meals = await readClaude(state, d);
+  expect(meals.map(m => m.session)).toEqual(["parent:one", "parent:two"]);
+  applyMeals(state, meals);
+  writeFileSync(p, line("a", "one"));
+  applyMeals(state, await readClaude(state, d));
+  expect(state.counters.total).toBe(2);
+  const c = join(dir(), "a.jsonl");
+  writeFileSync(c, JSON.stringify({ timestamp, type: "token_usage_record", payload: { response_id: "r", session_id: "parent", thread_id: "worker", usage: { input_tokens: 1 } } }) + "\n");
+  expect((await readCodex(emptyState(), join(c, "..")))[0].session).toBe("worker");
+});
+test("delivery sim, dry run, and unchanged device line", () => {
+  const d = dir(), state = emptyState(), previous = process.env.PUCKLING_FEED_DIR;
+  process.env.PUCKLING_FEED_DIR = d;
+  try {
+    expect(deliver("food", state, { dryRun: true, sim: true })).toBe(false);
+    expect(existsSync(join(d, "food.txt"))).toBe(false);
+    expect(deliver("food", state, { sim: true })).toBe(false);
+    expect(readFileSync(join(d, "food.txt"), "utf8")).toBe("food");
+    state.lastSent = "food";
+    expect(deliver("food", state, {})).toBe(false);
+  } finally {
+    if (previous === undefined) delete process.env.PUCKLING_FEED_DIR;
+    else process.env.PUCKLING_FEED_DIR = previous;
+  }
 });

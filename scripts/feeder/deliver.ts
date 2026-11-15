@@ -6,7 +6,7 @@ export function formatFood(state: State, date = new Date()) {
   const c = state.counters;
   return [1, c.total, c.claude, c.codex, c.opencode, c.night, c.parallel]
     .map(Math.floor)
-    .concat(-date.getTimezoneOffset())
+    .concat(-date.getTimezoneOffset(), state.generation)
     .join(" ");
 }
 export function deliver(
@@ -20,9 +20,9 @@ export function deliver(
 ) {
   if (opts.dryRun) return false;
   if (opts.sim) {
-    const dir = fileURLToPath(new URL("../../feed/", import.meta.url));
+    const dir = process.env.PUCKLING_FEED_DIR || fileURLToPath(new URL("../../feed/", import.meta.url));
     mkdirSync(dir, { recursive: true });
-    writeFileSync(`${dir}food.txt`, line);
+    writeFileSync(`${dir}/food.txt`, line);
     return false;
   }
   if (line === state.lastSent) return false;

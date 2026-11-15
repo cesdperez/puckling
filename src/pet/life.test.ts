@@ -3,7 +3,7 @@ import { age, createLife, feed, HATCH_KCAL, HUNGER_HOURS, isNight, MEAL_KCAL, pa
 import type { Food, Life } from "./life";
 
 function food(total: number, claude = total, codex = 0, opencode = 0, night = 0, parallel = 0): Food {
-  return { total, claude, codex, opencode, night, parallel, tzMinutes: 60 };
+  return { total, claude, codex, opencode, night, parallel, tzMinutes: 60, generation: 1 };
 }
 function teen(diet: Food): Life {
   return { ...createLife(), stage: "teen", lifetime: threshold("adult"), diet };
@@ -54,6 +54,16 @@ describe("life", () => {
     expect(reset.ate).toBe(110);
     expect(reset.life.diet.total).toBe(210);
   });
+  test("generation resets the baseline even when counters increased", () => {
+    const initial = feed(createLife(), food(100)).life;
+    const reset = feed(initial, { ...food(150), generation: 2 });
+    expect(reset.ate).toBe(150);
+    expect(feed(reset.life, { ...food(150), generation: 2 }).ate).toBe(0);
+    expect(parseLife(serializeLife(reset.life))?.last.generation).toBe(2);
+  });
+  test("progress is fractional within a stage", () => {
+    expect(progress({ ...createLife(), stage: "baby", lifetime: threshold("baby") + STAGE_KCAL / 2 })).toBe(0.5);
+  });
   test("fullness drains before starvation and loss floors at stage threshold", () => {
     const full = feed(createLife(), food(MEAL_KCAL * 2)).life;
     expect(full.fullness).toBe(1);
@@ -70,7 +80,7 @@ describe("life", () => {
     expect(restored).toEqual({ ...original, fullness: 0.123, lifetime: 50 });
     expect(serializeLife(original).length).toBeLessThan(4000);
     for (const text of ["", "garbage", "1 0 0", serializeLife(original) + " 1", serializeLife(original).replace("1 0 0", "2 0 0")]) expect(parseLife(text)).toBeUndefined();
-    expect(parseFood("1 10 4 3 3 2 1 -60")).toEqual({ total: 10, claude: 4, codex: 3, opencode: 3, night: 2, parallel: 1, tzMinutes: -60 });
+    expect(parseFood("1 10 4 3 3 2 1 -60 1")).toEqual({ total: 10, claude: 4, codex: 3, opencode: 3, night: 2, parallel: 1, tzMinutes: -60, generation: 1 });
     for (const text of ["", "garbage", "2 1 1 0 0 0 0 0", "1 1 0 0 0 0 0 x", "1 -1 0 0 0 0 0 0", "1 1.5 0 0 0 0 0 0"]) expect(parseFood(text)).toBeUndefined();
   });
   test("night uses local hour and requires a set clock", () => {

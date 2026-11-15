@@ -18,6 +18,7 @@ export type Meal = {
   usage: Usage;
 };
 export type State = {
+  generation: number;
   offsets: Record<string, number>;
   models: Record<string, string>;
   hasRecords: Record<string, boolean>;
@@ -35,6 +36,7 @@ export const statePath = () =>
   join(homedir(), ".local/state/puckling/feeder.json");
 export function emptyState(): State {
   return {
+    generation: Math.floor(Date.now() / 1000),
     offsets: {},
     models: {},
     hasRecords: {},
@@ -52,9 +54,10 @@ export function emptyState(): State {
   };
 }
 export function loadState(path = statePath()) {
-  return existsSync(path)
-    ? (JSON.parse(readFileSync(path, "utf8")) as State)
-    : null;
+  if (!existsSync(path)) return null;
+  const state = JSON.parse(readFileSync(path, "utf8")) as State;
+  state.generation ??= Math.floor(Date.now() / 1000);
+  return state;
 }
 export function saveState(state: State, path = statePath()) {
   mkdirSync(dirname(path), { recursive: true });

@@ -10,7 +10,7 @@ export function files(dir: string, since = 0): string[] {
     const p = join(dir, e.name);
     return e.isDirectory()
       ? files(p, since)
-      : e.isFile() && p.endsWith(".jsonl") && statSync(p).mtimeMs >= since
+      : e.isFile() && p.endsWith(".jsonl") && (!since || statSync(p).mtimeMs >= since)
         ? [p]
         : [];
   });
@@ -21,6 +21,7 @@ export async function lines(
   visit: (line: string) => void,
 ) {
   const size = statSync(path).size;
+  if (size === offset) return offset;
   let start = size < offset ? 0 : offset;
   let pending = Buffer.alloc(0);
   for await (const chunk of createReadStream(path, { start })) {
@@ -56,7 +57,7 @@ export async function readClaude(state: State, dir = claudeDir(), since = 0) {
             id: `claude:${m.id}`,
             tool: "claude",
             model: m.model || "",
-            session: x.sessionId || path,
+            session: x.agentId ? `${x.sessionId || path}:${x.agentId}` : x.sessionId || path,
             time: Date.parse(x.timestamp),
             usage: {
               input: u.input_tokens || 0,
