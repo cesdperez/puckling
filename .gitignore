@@ -5,3 +5,5 @@ dist/
 sim.png
 .DS_Store
 *.log
+
+feed/food.txt

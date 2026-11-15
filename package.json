@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "gallery": "bun scripts/gallery.ts",
     "sim": "node scripts/sim.mjs",
     "test": "bun test src/pet scripts/feeder",
     "check": "tsc --noEmit",
@@ -31,6 +32,7 @@
     "id": "puckling",
     "name": "Puckling",
     "entry": "src/index.tsx",
+    "webPreload": [{ "source": "feed", "target": "/sim" }],
     "targets": {
       "web": true,
       "esp32": true,

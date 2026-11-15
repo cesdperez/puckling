@@ -137,7 +137,12 @@ async function main() {
     throw new Error("Days and watch interval must be positive numbers");
   if (args.includes("--report")) return report(days);
   do {
-    await runOnce(args, backfill);
+    try {
+      await runOnce(args, backfill);
+    } catch (error) {
+      if (!watch) throw error;
+      console.error(String(error instanceof Error ? error.message : error).split("\n")[0]);
+    }
     if (watch) await Bun.sleep(Number(watch) * 1000);
   } while (watch);
 }
