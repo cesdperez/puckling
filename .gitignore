@@ -7,3 +7,5 @@ sim.png
 *.log
 
 feed/food.txt
+
+.env

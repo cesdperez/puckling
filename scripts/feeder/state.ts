@@ -19,6 +19,8 @@ export type Meal = {
 };
 export type State = {
   generation: number;
+  tokens: Record<string, Usage>;
+  days: Record<string, number>;
   offsets: Record<string, number>;
   models: Record<string, string>;
   hasRecords: Record<string, boolean>;
@@ -37,6 +39,8 @@ export const statePath = () =>
 export function emptyState(): State {
   return {
     generation: Math.floor(Date.now() / 1000),
+    tokens: {},
+    days: {},
     offsets: {},
     models: {},
     hasRecords: {},
@@ -56,6 +60,8 @@ export function emptyState(): State {
 export function loadState(path = statePath()) {
   if (!existsSync(path)) return null;
   const state = JSON.parse(readFileSync(path, "utf8")) as State;
+  state.tokens ??= {};
+  state.days ??= {};
   state.generation ??= Math.floor(Date.now() / 1000);
   return state;
 }

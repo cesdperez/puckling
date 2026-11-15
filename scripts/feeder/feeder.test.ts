@@ -9,7 +9,9 @@ import { readClaude } from "./claude";
 import { readCodex } from "./codex";
 import { readOpencode } from "./opencode";
 import { applyMeals, countReport } from "./main";
-import { deliver, formatFood } from "./deliver";
+import { deliver, formatFood, formatFeed } from "./deliver";
+import { displayModel } from "./tokens";
+import { serve, feedUrl } from "./serve";
 const dir = () => mkdtempSync(join(tmpdir(), "puckling-test-"));
 test("weight and model factors", () => {
   expect(modelFactor("GPT-opus")).toBe(1);
@@ -262,4 +264,52 @@ test("delivery sim, dry run, and unchanged device line", () => {
     if (previous === undefined) delete process.env.PUCKLING_FEED_DIR;
     else process.env.PUCKLING_FEED_DIR = previous;
   }
+});
+
+test("model names and raw meal tallies", () => {
+  expect(displayModel("claude-opus-5-5")).toBe("opus-5-5");
+  expect(displayModel("claude-haiku-4-5-20251001")).toBe("haiku-4-5");
+  expect(displayModel("gpt-6.1-terra")).toBe("gpt-6.1-terra");
+  expect(displayModel("")).toBe("unknown");
+  expect(displayModel("GPT Foo")).toBe("gpt-foo");
+  const state = emptyState(), time = new Date(2026, 0, 2, 12).getTime();
+  const meal = { id: "a", tool: "claude" as const, model: "claude-opus-5-5", session: "s", time, usage: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 } };
+  applyMeals(state, [meal, meal], 0, time);
+  expect(state.tokens["opus-5-5"]).toEqual(meal.usage);
+  expect(state.days).toEqual({ "2026-01-02": 10 });
+  for (let i = 1; i <= 9; i++) state.days[`2025-12-${String(i).padStart(2, "0")}`] = i;
+  applyMeals(state, [], 0, time);
+  expect(Object.keys(state.days).sort()).toHaveLength(8);
+  expect(state.days["2025-12-01"]).toBeUndefined();
+});
+
+test("feed format totals and groups models", () => {
+  const state = emptyState(), date = new Date(2026, 0, 2, 12);
+  state.generation = 42;
+  state.days["2026-01-02"] = 12;
+  for (let i = 1; i <= 7; i++) state.tokens[`m${i}`] = { input: i, output: 1, cacheRead: 2, cacheWrite: 3 };
+  state.tokens.zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  expect(formatFeed(state, date)).toBe(`1 0 0 0 0 0 0 ${-date.getTimezoneOffset()} 42\n1 42 70 28 7 14 21 12\nm7 13\nm6 12\nm5 11\nm4 10\nm3 9\nother 15\n`);
+});
+
+test("feed server waits for state and serves latest", async () => {
+  let state: ReturnType<typeof emptyState> | undefined;
+  const server = serve(0, () => state);
+  try {
+    const url = `http://127.0.0.1:${server.port}/feed`;
+    expect((await fetch(url)).status).toBe(503);
+    state = emptyState();
+    const response = await fetch(url);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.text()).toBe(formatFeed(state));
+    expect((await fetch(url, { method: "POST" })).status).toBe(404);
+  } finally { server.stop(); }
+});
+
+test("pair URL chooses first external IPv4", () => {
+  const entry = (address: string, family: "IPv4" | "IPv6", internal: boolean) => ({ address, family, internal, netmask: "", mac: "", cidr: null, ...(family === "IPv6" ? { scopeid: 0 } : {}) }) as import("node:os").NetworkInterfaceInfo;
+  expect(feedUrl({ lo: [entry("127.0.0.1", "IPv4", true)], en: [entry("::1", "IPv6", false), entry("192.168.1.2", "IPv4", false)] }, 7878)).toBe("http://192.168.1.2:7878/feed");
+  expect(() => feedUrl({}, 7878)).toThrow();
 });

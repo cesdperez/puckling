@@ -11,6 +11,8 @@ import {
 } from "./state";
 import { weigh } from "./weigh";
 import { deliver, formatFood } from "./deliver";
+import { displayModel, localDay, tokenTotal } from "./tokens";
+import { pair, serve } from "./serve";
 function newMeal(meal: Meal, since: number, seen: Record<string, number>): boolean {
   if (!Number.isFinite(meal.time) || meal.time < since || seen[meal.id] !== undefined) return false;
   seen[meal.id] = meal.time;
@@ -25,6 +27,11 @@ export function applyMeals(
   const eaten = { claude: 0, codex: 0, opencode: 0 };
   for (const m of meals.sort((a, b) => a.time - b.time)) {
     if (!newMeal(m, since, state.seen)) continue;
+    const model = displayModel(m.model);
+    const usage = state.tokens[model] ??= { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+    for (const key of Object.keys(usage) as (keyof typeof usage)[]) usage[key] += m.usage[key];
+    const day = localDay(new Date(m.time));
+    state.days[day] = (state.days[day] ?? 0) + tokenTotal(m.usage);
     const kcal = weigh(m.usage, m.model) / 1000;
     eaten[m.tool] += kcal;
     state.counters.total += kcal;
@@ -38,6 +45,7 @@ export function applyMeals(
     if (new Set(state.recent.map((x) => x.session)).size >= 3)
       state.counters.parallel += kcal;
   }
+  for (const day of Object.keys(state.days).sort().slice(0, -8)) delete state.days[day];
   for (const [id, time] of Object.entries(state.seen))
     if (time < Math.min(now - 3 * 86400000, state.watermark - 3600000)) delete state.seen[id];
   state.recent = state.recent.filter((x) => x.time >= now - 600000);
@@ -102,7 +110,7 @@ async function runOnce(args: string[], backfill?: string) {
     `claude ${eaten.claude.toFixed(2)} codex ${eaten.codex.toFixed(2)} opencode ${eaten.opencode.toFixed(2)} | ${line}`,
   );
   if (
-    deliver(line, state, {
+    (!args.includes("--serve") || args.includes("--sim")) && deliver(line, state, {
       sim: args.includes("--sim"),
       dryRun: args.includes("--dry-run"),
       port: value(args, "--port"),
@@ -111,6 +119,7 @@ async function runOnce(args: string[], backfill?: string) {
     state.lastSent = line;
     saveState(state);
   }
+  return state;
 }
 function value(args: string[], flag: string) {
   const i = args.indexOf(flag);
@@ -124,6 +133,15 @@ async function main() {
   const days = Number(value(args, "--days") ?? 7);
   const backfill = value(args, "--backfill");
   const watch = value(args, "--watch");
+  const serveArg = value(args, "--serve");
+  const port = serveArg === undefined ? undefined : Number(serveArg);
+  const pairing = args.includes("--pair");
+  if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) throw new Error("Invalid serve port");
+  if (pairing && port === undefined) throw new Error("--pair requires --serve");
+  if (pairing) return pair(port!, value(args, "--port"));
+  if (port !== undefined && !watch) throw new Error("--serve requires --watch");
+  let latest: State | undefined;
+  if (port !== undefined) serve(port, () => latest);
   if (
     !Number.isFinite(days) ||
     days <= 0 ||
@@ -136,7 +154,7 @@ async function main() {
   if (args.includes("--report")) return report(days);
   do {
     try {
-      await runOnce(args, backfill);
+      latest = await runOnce(args, backfill);
     } catch (error) {
       if (!watch) throw error;
       console.error(String(error instanceof Error ? error.message : error).split("\n")[0]);
