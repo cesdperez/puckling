@@ -76,4 +76,4 @@ The stored value does not parse as a life, so the app starts a fresh egg. The ru
 
 ## License
 
-Repo source is MIT, see [LICENSE](LICENSE). Firmware binaries built with GeaStack's embedded targets are GPL-3.0-only, because those targets carry that license. The GeaStack framework and compiler are Apache-2.0.
+Repo source is MIT, see [LICENSE](LICENSE). Firmware binaries built with GeaStack's embedded targets are GPL-3.0-only, because those targets carry that license. The GeaStack framework and compiler are Apache-2.0. The Inter fonts in `assets/fonts` are under the SIL Open Font License, see [assets/fonts/OFL.txt](assets/fonts/OFL.txt).

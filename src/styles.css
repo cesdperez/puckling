@@ -15,5 +15,5 @@ canvas { width: 466px; height: 466px; }
 .font-body-16 { font-family: 'Inter'; font-size: 16px; }
 .font-body-20 { font-family: 'Inter'; font-size: 20px; }
 .font-body-26 { font-family: 'Inter'; font-size: 26px; }
-.font-display-40 { font-family: 'InterDisplay'; font-size: 40px; --gea-font-charset: '0123456789.kMBT'; }
+.font-display-40 { font-family: 'InterDisplay'; font-size: 40px; --gea-font-charset: '0123456789.kMBTe+'; }
 .font-display-64 { font-family: 'InterDisplay'; font-size: 64px; --gea-font-charset: 'LV0123456789 '; }
