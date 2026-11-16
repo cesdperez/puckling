@@ -19,7 +19,7 @@ npm run check        # tsc --noEmit
 
 The emulator shell is at http://127.0.0.1:5181/__gea_emulator.
 
-`npm run sim:screenshot [file.png]` captures the running sim with Playwright (default `./sim.png`). The first run needs `npx playwright install chromium`.
+`npm run sim:screenshot [file.png] [page]` captures the running sim with Playwright (default `./sim.png` on page 0). A page of 1 to 3 swipes to that stats page first. The first run needs `npx playwright install chromium`.
 
 ## Feed it
 
@@ -65,10 +65,18 @@ Food over USB, eating, hatching, and growth across reboots are checked on the pu
 ### Reset growth
 
 ```sh
+mv ~/.local/state/puckling/feeder.json ~/.local/state/puckling/feeder.json.old
+npm run feed:pair        # puck on USB: new feeder state and a new key
 npx gea devctl storage set life 0
+npx gea devctl storage set evo 0
+npx gea devctl storage set food 0
+npx gea devctl reboot
+npm run feed:ble
 ```
 
-The stored value does not parse as a life, so the app starts a fresh egg. The running app replaces the value on its next save, which is a meal, an evolution, or ten minutes, so reboot the puck straight after.
+The feeder's food line is a running total, not a per-day amount, and a fresh life has `seen` false, so it counts the first line it reads as a whole meal. Resetting `life` alone makes the egg eat that total and climb a stage per poll. Reset the feeder state as well, or the old total comes straight back. A new feeder counts from now unless you pass `--backfill` to the first feed, and `PUCKLING_FEEDER_STATE` moves the state file. Clearing `evo` drops the old name and token snapshot, and clearing `food` drops the last USB food line.
+
+The running app overwrites each key on its next save, which is a meal, an evolution, or ten minutes, so reboot the puck straight after.
 
 ## Layout
 
@@ -76,4 +84,4 @@ The stored value does not parse as a life, so the app starts a fresh egg. The ru
 
 ## License
 
-Repo source is MIT, see [LICENSE](LICENSE). Firmware binaries built with GeaStack's embedded targets are GPL-3.0-only, because those targets carry that license. The GeaStack framework and compiler are Apache-2.0.
+Repo source is MIT, see [LICENSE](LICENSE). Firmware binaries built with GeaStack's embedded targets are GPL-3.0-only, because those targets carry that license. The GeaStack framework and compiler are Apache-2.0. The Inter fonts in `assets/fonts` are under the SIL Open Font License, see [assets/fonts/OFL.txt](assets/fonts/OFL.txt).
