@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { createLife } from './pet/life'
 import { CENTER, drawScreen, FONTS, GAP, LEFT, RIGHT, screenKey, type ScreenData } from './screens'
+import { PAGES } from './ui/pager'
 
 const data: ScreenData = {
   life: createLife(),
@@ -12,20 +13,26 @@ const data: ScreenData = {
 
 type Metric = number | ((value: string) => number)
 type Drawn = { value: string; x: number; y: number; font: string; color: string }
-function recorder(metric: Metric, inkCenter = true) {
-  const labels: Drawn[] = [], arcs: number[][] = []
+type Rect = { x: number; y: number; w: number; h: number; color: string }
+type Ink = (value: string, font: string) => number
+function recorder(metric: Metric, ink: boolean | Ink = true) {
+  const labels: Drawn[] = [], paths: number[][][] = [], rects: Rect[] = []
   const width = (value: string) => typeof metric === 'function' ? metric(value) : metric
+  const measured = typeof ink === 'function' ? ink : () => 0
+  let path: number[][] = []
   const ctx = {
     font: '', fillStyle: '',
     measureText: (value: string) => width(value),
-    ...(inkCenter ? { measureTextInkCenter: () => 0 } : {}),
+    ...(ink ? { measureTextInkCenter: (value: string) => measured(value, ctx.font) } : {}),
     fillText(value: string, x: number, y: number) { labels.push({ value, x, y, font: ctx.font, color: ctx.fillStyle }) },
-    fillRect: () => {},
-    beginPath: () => {},
-    arc: (x: number, y: number, radius: number) => { arcs.push([x, y, radius]) },
-    fill: () => {},
+    fillRect(x: number, y: number, w: number, h: number) { rects.push({ x, y, w, h, color: ctx.fillStyle }) },
+    beginPath() { path = [] },
+    moveTo(x: number, y: number) { path.push([x, y]) },
+    lineTo(x: number, y: number) { path.push([x, y]) },
+    closePath() {},
+    fill() { paths.push(path) },
   }
-  return { ctx, labels, arcs }
+  return { ctx, labels, paths, rects }
 }
 const width = (value: string) => value.length * 8
 
@@ -45,16 +52,50 @@ test('a model share change redraws the token page', () => {
   expect(screenKey(2, { ...data, tokens: { ...data.tokens!, models } })).not.toBe(screenKey(2, { ...data, tokens: { ...data.tokens!, models: other } }))
 })
 
-test('centres display text and draws arcs with filled circles', () => {
-  const { ctx, labels, arcs } = recorder(0)
+test('centres display text and draws the arc band as filled polygons', () => {
+  const { ctx, labels, paths } = recorder(0)
   drawScreen(ctx as never, 1, data)
   const label = labels.find(item => item.value === 'LV 0')!
   expect(label.x).toBe(CENTER - ('LV 0'.length * 32) / 2)
   expect(label.font).toBe('64px InterDisplay')
-  expect(arcs.length).toBeGreaterThan(30)
-  expect(arcs[0][0]).toBeCloseTo(CENTER, 2)
-  expect(arcs[0][1]).toBeCloseTo(CENTER - 206, 2)
-  expect(arcs[0][2]).toBe(5)
+  const quads = paths.filter(points => points.length === 4)
+  expect(quads.length).toBeGreaterThan(100)
+  const radiusOf = (point: number[]) => Math.hypot(point[0] - CENTER, point[1] - CENTER)
+  for (const point of quads[0].slice(0, 2)) expect(radiusOf(point)).toBeCloseTo(211, 3)
+  for (const point of quads[0].slice(2)) expect(radiusOf(point)).toBeCloseTo(201, 3)
+})
+
+test('draws page dots as filled squares', () => {
+  const { ctx, rects } = recorder(width)
+  drawScreen(ctx as never, 3, data)
+  const dots = rects.filter(rect => rect.h === 6)
+  expect(dots.length).toBe(PAGES)
+  expect(dots[3]).toMatchObject({ x: 203 + 3 * 20 - 5, y: 421, w: 10 })
+  expect(dots[0]).toMatchObject({ x: 203 - 3, w: 6 })
+  expect(dots[3].color).not.toBe(dots[0].color)
+})
+
+test('centres every string in a font on the cap height, not its own ink', () => {
+  const ink = (value: string) => value === 'H' ? 7 : 12
+  const { ctx, labels } = recorder(width, ink)
+  drawScreen(ctx as never, 3, data)
+  const label = labels.find(item => item.value === 'Today')!
+  const value = labels.find(item => item.value === '100')!
+  expect(label.y).toBe(value.y)
+  expect(label.y).toBe(148 - 7)
+})
+
+test('hangs the smaller token delta from the value cap line', () => {
+  const ink = (value: string, font: string) => value === 'H' ? (font.startsWith('13') ? 5 : 7) : 12
+  const tokens = { ...data.tokens!, total: 100, models: [{ model: 'opus', tokens: 60 }] }
+  const snapshot = [{ model: 'opus', tokens: 20 }]
+  const { ctx, labels } = recorder(width, ink)
+  drawScreen(ctx as never, 2, { ...data, evo: { ...data.evo, snapshot }, tokens })
+  const value = labels.find(item => item.value === '60')!
+  const delta = labels.find(item => item.value === '+40')!
+  // The 13px delta and the 16px value share their ink top, so their cap lines meet.
+  expect(value.y).toBe(186 - 7)
+  expect(delta.y).toBe(value.y)
 })
 
 test('right-aligns values and left-aligns labels at the layout edges', () => {
