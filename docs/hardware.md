@@ -34,8 +34,11 @@ The `puck` alias carries this puck's USB serial, so flash, monitor and screensho
 - NVS keys are at most 15 characters, and `localStorage` on the device is NVS. That is why the keys are `food`, `life`, `evo` and `feedkey`.
 - `geatsc` fails on `JSON.stringify` of an optional value. Pass a defined value, or stringify it behind a guard.
 - `fillText` anchors the top-left of the text, and `textAlign` does nothing. Centre a string yourself with `measureText` and subtract half the width.
-- Without a baked font atlas, the device draws a scaled 8x16 bitmap font but `measureText` and `measureTextInkCenter` return zero. Its ASCII cell width is `round(fontSize / 2)`.
-- The bitmap font does not contain `Σ`. Use ASCII text.
+- Canvas text uses fonts baked from `src/styles.css`. Each `@font-face` family is baked once per size that a CSS rule names with `font-family` and `font-size`, so every family and px size that `ctx.font` uses in `src/screens.ts` needs a matching rule there. A missing pair falls back to the scaled 8x16 bitmap font, where `measureText` returns 0 and the ASCII cell width is `round(fontSize / 2)`.
+- Atlases are keyed by family, not weight, so each weight is its own family: `Inter` is Medium, `InterDisplay` is Display Bold.
+- Large sizes carry `--gea-font-charset` to keep flash small. A character outside it renders as `?`, so widen the charset when a display string gains a character.
+- The board target declares `cssDevicePixelRatio: 1.5`, which bakes each CSS size at 1.5x while the canvas looks the atlases up by raw px. `package.json` sets `gea.cssDevicePixelRatio: 1` so they match, and removing it breaks the text.
+- A browser canvas does not load a webfont on its own, so `src/index.tsx` loads each face for the sim.
 - Canvas `stroke()` treats an arc as a one-pixel full circle rather than a partial thick arc. Use filled circles for thick arcs.
 - The browser sim's `Battery` has `level()` only, with no `charging()`, and no `measureTextInkCenter`. Calls to those sit in `try`/`catch`.
 - `gea devctl storage set <key> <value>` writes the app's NVS-backed `localStorage`. It presets the food line the feeder sends, and `storage set life 0` resets growth, because the text does not parse as a life. The running app overwrites the key on its next save, so reboot straight after a reset.

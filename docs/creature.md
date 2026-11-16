@@ -70,10 +70,12 @@ The behaviour is deterministic from a seed, so `bun test src/pet` can replay it 
 
 Swipe left or right to move between four pages. A dot row under the centre marks the current one.
 
-- 0 home: the creature, with a dim `LV <n> <name>` label across the bottom.
-- 1 evo: the level, the stage and branch, the evo name, and a progress ring around the bezel, with `next evo NN%` or `max lv` at the final form, and `+X tok since evo`.
-- 2 tokens per model: the top five models plus `other`, each with its lifetime total and the tokens gained since the last evolution.
-- 3 sys: total tokens, today, input and output, cache read and write, battery and the age of the last Bluetooth link.
+- 0 home: the creature, with a dim `LV n` and the evo name across the bottom.
+- 1 evo: `LV n` in large type, the stage and branch as `Adult - Ember`, the evo name, and a progress ring around the bezel, with `NN% to next` or `Max level` at the final form, and `+N tokens since evo`.
+- 2 tokens: titled `Tokens`, with the all-time total, then a row per model with its total, the gain since evo and a share bar. It shows the five largest models plus `other`.
+- 3 system: titled `System`, with today, input and output, cache read and write, battery and the age of the last Bluetooth link.
+
+With no food yet, the stats pages say `Waiting for food`.
 
 The stats pages return to home after 20 seconds without a touch, so static text does not burn into the AMOLED. A tap reaches the creature on home only.
 
