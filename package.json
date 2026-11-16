@@ -34,6 +34,7 @@
     "id": "puckling",
     "name": "Puckling",
     "entry": "src/index.tsx",
+    "cssDevicePixelRatio": 1,
     "webPreload": [{ "source": "feed", "target": "/sim" }],
     "targets": {
       "web": true,

@@ -19,7 +19,7 @@ npm run check        # tsc --noEmit
 
 The emulator shell is at http://127.0.0.1:5181/__gea_emulator.
 
-`npm run sim:screenshot [file.png]` captures the running sim with Playwright (default `./sim.png`). The first run needs `npx playwright install chromium`.
+`npm run sim:screenshot [file.png] [page]` captures the running sim with Playwright (default `./sim.png` on page 0). A page of 1 to 3 swipes to that stats page first. The first run needs `npx playwright install chromium`.
 
 ## Feed it
 
